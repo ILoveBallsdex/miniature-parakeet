@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ card.name }} — FutBot Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('cards') }}" class="btn btn-outline-secondary btn-sm me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h4 class="mb-0 fw-bold">{{ card.name }}</h4>
+    <small class="text-muted">Card ID: {{ card.card_id }}</small>
+  </div>
+</div>
+
+<div class="card form-card p-4">
+  <form method="post">
+    {% include '_card_form.html' %}
+    <div class="d-flex gap-2 mt-4">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-lg me-1"></i>Save Changes
+      </button>
+      <a href="{{ url_for('cards') }}" class="btn btn-outline-secondary">Cancel</a>
+      <form method="post" action="{{ url_for('delete_card', card_id=card.card_id) }}"
+            class="ms-auto"
+            onsubmit="return confirm('Permanently delete {{ card.name }}?')">
+        <button type="submit" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-trash me-1"></i>Delete Card
+        </button>
+      </form>
+    </div>
+  </form>
+</div>
+{% endblock %}

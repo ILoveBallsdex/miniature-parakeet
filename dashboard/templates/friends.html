@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Friends — FutBot Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0 fw-bold">Friends
+    {% if not table_missing %}
+      <span class="badge bg-secondary ms-2">{{ total }}</span>
+    {% endif %}
+  </h4>
+</div>
+
+{% if table_missing %}
+  <div class="alert alert-warning">
+    Tables <code>friendships</code> and <code>friend_requests</code> do not exist yet — run the bot once to create them.
+  </div>
+{% else %}
+
+<ul class="nav nav-pills mb-3">
+  <li class="nav-item">
+    <a class="nav-link {% if mode == 'friendships' %}active{% endif %}"
+       href="{{ url_for('friends', mode='friendships', search=search) }}">
+      <i class="bi bi-people me-1"></i>Friendships
+      <span class="badge bg-light text-dark ms-1">{{ friendships | length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if mode == 'requests' %}active{% endif %}"
+       href="{{ url_for('friends', mode='requests', search=search) }}">
+      <i class="bi bi-envelope me-1"></i>Pending Requests
+      <span class="badge bg-light text-dark ms-1">{{ requests | length }}</span>
+    </a>
+  </li>
+</ul>
+
+<form method="get" class="card filter-bar mb-4 p-3">
+  <input type="hidden" name="mode" value="{{ mode }}">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-5">
+      <input type="text" name="search" class="form-control form-control-sm"
+             placeholder="Search by name or ID…" value="{{ search }}">
+    </div>
+    <div class="col-md-2 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+        <i class="bi bi-search"></i>
+      </button>
+      <a href="{{ url_for('friends', mode=mode) }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x"></i>
+      </a>
+    </div>
+  </div>
+</form>
+
+{% if mode == 'friendships' %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle card-table">
+    <thead>
+      <tr>
+        <th>Player A</th>
+        <th>Player B</th>
+        <th>Since</th>
+        <th style="width:60px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in friendships %}
+      <tr>
+        <td class="fw-semibold">
+          {{ row['user_name'] or row['user_id'] }}
+          <span class="text-muted small ms-1 font-monospace">{{ row['user_id'] }}</span>
+        </td>
+        <td class="fw-semibold">
+          {{ row['friend_name'] or row['friend_id'] }}
+          <span class="text-muted small ms-1 font-monospace">{{ row['friend_id'] }}</span>
+        </td>
+        <td class="text-muted small">{{ (row['added_at'] or '')[:16] }}</td>
+        <td>
+          <form method="post" action="{{ url_for('unfriend') }}"
+                onsubmit="return confirm('Remove this friendship (both directions)?')">
+            <input type="hidden" name="user_id"   value="{{ row['user_id'] }}">
+            <input type="hidden" name="friend_id" value="{{ row['friend_id'] }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger" title="Unfriend">
+              <i class="bi bi-person-x"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center text-muted py-5">No friendships found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% else %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle card-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Requester</th>
+        <th>Recipient</th>
+        <th>Sent</th>
+        <th>Notified</th>
+        <th style="width:60px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in requests %}
+      <tr>
+        <td class="font-monospace small text-muted">{{ row['request_id'] }}</td>
+        <td class="fw-semibold">
+          {{ row['requester_name'] or row['requester_id'] }}
+          <span class="text-muted small ms-1 font-monospace">{{ row['requester_id'] }}</span>
+        </td>
+        <td class="fw-semibold">
+          {{ row['recipient_name'] or row['recipient_id'] }}
+          <span class="text-muted small ms-1 font-monospace">{{ row['recipient_id'] }}</span>
+        </td>
+        <td class="text-muted small">{{ (row['requested_at'] or '')[:16] }}</td>
+        <td>
+          {% if row['notified'] %}
+            <span class="badge bg-success">Yes</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Pending</span>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post"
+                action="{{ url_for('delete_friend_request', request_id=row['request_id']) }}"
+                onsubmit="return confirm('Delete this friend request?')">
+            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-muted py-5">No pending requests.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

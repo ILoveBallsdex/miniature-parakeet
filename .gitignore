@@ -1,0 +1,8 @@
+# .gitignore
+.env
+cards_game.db
+pitch.png
+CLAUDE.md
+.claude/
+dashboard/.config.json
+activity.md

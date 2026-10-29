@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Fantasy Cards — FutBot Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0 fw-bold">Fantasy Cards
+    {% if not table_missing %}
+      <span class="badge bg-secondary ms-2">{{ total }}</span>
+    {% endif %}
+  </h4>
+</div>
+
+{% if table_missing %}
+  <div class="alert alert-warning">
+    Table <code>fantasy_cards</code> does not exist in this database.
+  </div>
+{% else %}
+
+<form method="get" class="card filter-bar mb-4 p-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-5">
+      <input type="text" name="search" class="form-control form-control-sm"
+             placeholder="Search across all columns…" value="{{ search }}">
+    </div>
+    <div class="col-md-2 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+        <i class="bi bi-search"></i>
+      </button>
+      <a href="{{ url_for('fantasy_cards') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x"></i>
+      </a>
+    </div>
+  </div>
+</form>
+
+{% if cols %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle card-table">
+    <thead>
+      <tr>
+        {% for col in cols %}
+          <th>{{ col }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        {% for col in cols %}
+          <td>{{ row[col] if row[col] is not none else '—' }}</td>
+        {% endfor %}
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="{{ cols | length }}" class="text-center text-muted py-5">
+          No rows found.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+  <div class="alert alert-secondary">Table exists but has no columns.</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

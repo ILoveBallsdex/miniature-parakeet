@@ -1,0 +1,96 @@
+<!-- Shared card form fields — used by add_card.html and edit_card.html -->
+<div class="row g-3">
+
+  <!-- Row 1: Identity -->
+  <div class="col-md-5">
+    <label class="form-label">Player Name <span class="text-danger">*</span></label>
+    <input type="text" name="name" class="form-control"
+           value="{{ card.get('name', '') }}" required>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Player ID</label>
+    <input type="text" name="player_id" class="form-control"
+           value="{{ card.get('player_id', '') }}"
+           placeholder="e.g. mbappe_01">
+  </div>
+  <div class="col-md-2">
+    <label class="form-label">Position</label>
+    <select name="position" class="form-select">
+      <option value="">—</option>
+      {% for p in positions %}
+        <option value="{{ p }}" {% if card.get('position') == p %}selected{% endif %}>{{ p }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label">Height</label>
+    <input type="text" name="height" class="form-control"
+           value="{{ card.get('height', '') }}" placeholder="e.g. 182cm">
+  </div>
+
+  <!-- Row 2: Stats -->
+  <div class="col-md-2">
+    <label class="form-label fw-semibold">Overall <span class="text-danger">*</span></label>
+    <input type="number" name="overall" class="form-control stat-input"
+           min="0" max="99" value="{{ card.get('overall', '') }}" required>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label">Attack <span class="text-danger">*</span></label>
+    <input type="number" name="attack" class="form-control stat-input"
+           min="0" max="99" value="{{ card.get('attack', '') }}" required>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label">Defense <span class="text-danger">*</span></label>
+    <input type="number" name="defense" class="form-control stat-input"
+           min="0" max="99" value="{{ card.get('defense', '') }}" required>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label">Speed <span class="text-danger">*</span></label>
+    <input type="number" name="speed" class="form-control stat-input"
+           min="0" max="99" value="{{ card.get('speed', '') }}" required>
+  </div>
+
+  <!-- Row 3: Club / Nation / League -->
+  <div class="col-md-4">
+    <label class="form-label">Club</label>
+    <input type="text" name="club" class="form-control"
+           value="{{ card.get('club', '') }}">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Nation</label>
+    <input type="text" name="nation" class="form-control"
+           value="{{ card.get('nation', '') }}">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">League</label>
+    <input type="text" name="league" class="form-control"
+           value="{{ card.get('league', '') }}">
+  </div>
+
+  <!-- Row 4: Rarity / Type / Image -->
+  <div class="col-md-3">
+    <label class="form-label">Rarity <span class="text-danger">*</span></label>
+    <select name="card_rarity" class="form-select" required>
+      <option value="">Select rarity…</option>
+      {% for r in rarities %}
+        <option value="{{ r }}" {% if card.get('card_rarity') == r %}selected{% endif %}>{{ r }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Card Type <span class="text-danger">*</span></label>
+    <input type="text" name="card_type" class="form-control"
+           value="{{ card.get('card_type', 'Standard') }}"
+           list="card-type-suggestions" required
+           placeholder="Standard, Icon, Hero…">
+    <datalist id="card-type-suggestions">
+      {% for t in card_types %}<option value="{{ t }}">{% endfor %}
+    </datalist>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">Image Path</label>
+    <input type="text" name="image_path" class="form-control font-monospace"
+           value="{{ card.get('image_path', '/home/container/images/') }}">
+  </div>
+
+</div>

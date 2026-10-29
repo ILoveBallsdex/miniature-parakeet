@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Inventories — FutBot Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0 fw-bold">Inventories
+    <span class="badge bg-secondary ms-2">{{ total }}</span>
+  </h4>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#addPanel">
+    <i class="bi bi-plus-lg me-1"></i>Give Card
+  </button>
+</div>
+
+<!-- Add entry panel -->
+<div class="collapse mb-4" id="addPanel">
+  <div class="card filter-bar p-3">
+    <form method="post" action="{{ url_for('add_inventory') }}">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label">Player</label>
+          <select name="user_id" class="form-select form-select-sm" required>
+            <option value="">Select player…</option>
+            {% for p in all_players %}
+              <option value="{{ p['user_id'] }}">{{ p['name'] or p['user_id'] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Card</label>
+          <select name="card_id" class="form-select form-select-sm" required>
+            <option value="">Select card…</option>
+            {% for c in all_cards %}
+              <option value="{{ c['card_id'] }}">{{ c['name'] }} ({{ c['overall'] }} OVR)</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-primary btn-sm w-100">Give Card</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Filter -->
+<form method="get" class="card filter-bar mb-4 p-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <input type="text" name="user_id" class="form-control form-control-sm"
+             placeholder="Filter by player name or ID…" value="{{ user_filter }}">
+    </div>
+    <div class="col-md-3">
+      <input type="text" name="card_search" class="form-control form-control-sm"
+             placeholder="Filter by card name…" value="{{ card_filter }}">
+    </div>
+    <div class="col-md-2 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+        <i class="bi bi-search"></i>
+      </button>
+      <a href="{{ url_for('inventories') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x"></i>
+      </a>
+    </div>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle card-table">
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>User ID</th>
+        <th>Card</th>
+        <th>OVR</th>
+        <th>Rarity</th>
+        <th>Edition</th>
+        <th style="width:60px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="fw-semibold">{{ row['player_name'] or '—' }}</td>
+        <td class="text-muted small font-monospace">{{ row['user_id'] }}</td>
+        <td>{{ row['card_name'] or row['card_id'] }}</td>
+        <td>
+          {% if row['overall'] %}
+            <span class="badge ovr-badge ovr-{{ row['overall'] // 10 * 10 }}">{{ row['overall'] }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if row['card_rarity'] %}
+            <span class="rarity-badge rarity-{{ row['card_rarity'] | replace(' ', '-') | lower }}">{{ row['card_rarity'] }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="text-muted small">{{ row['edition'] }}</td>
+        <td>
+          <form method="post"
+                action="{{ url_for('delete_inventory', rowid=row['rowid']) }}"
+                onsubmit="return confirm('Remove this card from {{ row['player_name'] or row['user_id'] }}?')">
+            <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-center text-muted py-5">No inventory entries found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

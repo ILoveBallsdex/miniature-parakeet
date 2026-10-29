@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Packs — FutBot Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0 fw-bold">Packs
+    <span class="badge bg-secondary ms-2">{{ total }}</span>
+  </h4>
+  {% if not table_missing %}
+  <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#givePackPanel">
+    <i class="bi bi-plus-lg me-1"></i>Give Pack
+  </button>
+  {% endif %}
+</div>
+
+{% if not table_missing %}
+<!-- Give Pack panel -->
+<div class="collapse mb-4" id="givePackPanel">
+  <div class="card filter-bar p-3">
+    <form method="post" action="{{ url_for('give_pack') }}">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label">Player</label>
+          <select name="user_id" class="form-select form-select-sm" required>
+            <option value="">Select player…</option>
+            {% for p in all_players %}
+              <option value="{{ p['user_id'] }}">{{ p['name'] or p['user_id'] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Pack Type</label>
+          <select name="pack_col" class="form-select form-select-sm" required>
+            <option value="">Select pack…</option>
+            {% for col in pack_cols %}
+              <option value="{{ col }}">{{ col | replace('_', ' ') | title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Quantity</label>
+          <input type="number" name="quantity" class="form-control form-control-sm"
+                 value="1" min="1">
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-primary btn-sm w-100">Give Pack</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if table_missing %}
+  <div class="alert alert-danger">
+    Table <code>packs</code> does not exist yet — run the bot once to create it.
+  </div>
+{% else %}
+
+<form method="get" class="card filter-bar mb-4 p-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <input type="text" name="user_id" class="form-control form-control-sm"
+             placeholder="Filter by player name or ID…" value="{{ user_filter }}">
+    </div>
+    <div class="col-md-2 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+        <i class="bi bi-search"></i>
+      </button>
+      <a href="{{ url_for('packs') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x"></i>
+      </a>
+    </div>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle card-table">
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>User ID</th>
+        {% for col in pack_cols %}
+          <th>{{ col | replace('_', ' ') | title }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="fw-semibold">{{ row['player_name'] or '—' }}</td>
+        <td class="text-muted small font-monospace">{{ row['user_id'] }}</td>
+        {% for col in pack_cols %}
+        <td>
+          <form method="post"
+                action="{{ url_for('edit_pack', user_id=row['user_id'], col=col) }}"
+                class="d-flex gap-1 align-items-center">
+            <input type="number" name="quantity" value="{{ row[col] or 0 }}"
+                   min="0" class="form-control form-control-sm"
+                   style="width:65px">
+            <button type="submit" class="btn btn-sm btn-outline-primary" title="Save">
+              <i class="bi bi-check"></i>
+            </button>
+          </form>
+        </td>
+        {% endfor %}
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="{{ 2 + pack_cols|length }}" class="text-center text-muted py-5">
+          No pack entries found.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

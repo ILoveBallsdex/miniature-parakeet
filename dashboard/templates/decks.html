@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Decks — FutBot Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0 fw-bold">Decks
+    <span class="badge bg-secondary ms-2">{{ total }}</span>
+  </h4>
+</div>
+
+<form method="get" class="card filter-bar mb-4 p-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <input type="text" name="user_id" class="form-control form-control-sm"
+             placeholder="Filter by player name or ID…" value="{{ user_filter }}">
+    </div>
+    <div class="col-md-2 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+        <i class="bi bi-search"></i>
+      </button>
+      <a href="{{ url_for('decks') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x"></i>
+      </a>
+    </div>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle card-table">
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>User ID</th>
+        <th>Deck Name</th>
+        <th>Cards</th>
+        <th>Card IDs</th>
+        <th style="width:60px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for deck in decks %}
+      <tr>
+        <td class="fw-semibold">{{ deck['player_name'] or '—' }}</td>
+        <td class="text-muted small font-monospace">{{ deck['user_id'] }}</td>
+        <td>{{ deck['deck_name'] }}</td>
+        <td><span class="badge bg-secondary">{{ deck['card_count'] }}</span></td>
+        <td class="text-muted small font-monospace" style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+            title="{{ deck['cards'] }}">
+          {{ deck['cards'] }}
+        </td>
+        <td>
+          <form method="post"
+                action="{{ url_for('delete_deck', rowid=deck['rowid']) }}"
+                onsubmit="return confirm('Delete deck &quot;{{ deck['deck_name'] }}&quot;?')">
+            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-muted py-5">No decks found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Players — FutBot Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0 fw-bold">Players
+    <span class="badge bg-secondary ms-2">{{ total }}</span>
+  </h4>
+</div>
+
+<form method="get" class="card filter-bar mb-4 p-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <input type="text" name="search" class="form-control form-control-sm"
+             placeholder="Search by name or ID…" value="{{ search }}">
+    </div>
+    <div class="col-md-2 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+        <i class="bi bi-search"></i>
+      </button>
+      <a href="{{ url_for('players') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x"></i>
+      </a>
+    </div>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle card-table">
+    <thead>
+      <tr>
+        {{ sort_th('ID',       'user_id',       sort, order) }}
+        {{ sort_th('Name',     'name',           sort, order) }}
+        {{ sort_th('Coins',    'coins',          sort, order) }}
+        {{ sort_th('Streak',   'daily_streak',   sort, order) }}
+        {{ sort_th('Wins',     'battles_won',    sort, order) }}
+        {{ sort_th('Dropped',  'cards_dropped',  sort, order) }}
+        <th>Title</th>
+        <th style="width:60px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in players %}
+      <tr>
+        <td class="text-muted small font-monospace">{{ p['user_id'] }}</td>
+        <td class="fw-semibold">{{ p['name'] or '—' }}</td>
+        <td>{{ p['coins'] if 'coins' in p.keys() else '—' }}</td>
+        <td>{{ p['daily_streak'] if 'daily_streak' in p.keys() else '—' }}</td>
+        <td>{{ p['battles_won'] or 0 }}</td>
+        <td>{{ p['cards_dropped'] if 'cards_dropped' in p.keys() else '—' }}</td>
+        <td class="text-muted small">{{ p['display_title'] if 'display_title' in p.keys() else '—' }}</td>
+        <td>
+          <a href="{{ url_for('edit_player', user_id=p['user_id']) }}"
+             class="btn btn-sm btn-outline-primary" title="Edit">
+            <i class="bi bi-pencil"></i>
+          </a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="text-center text-muted py-5">No players found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

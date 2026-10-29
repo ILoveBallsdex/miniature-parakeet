@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Cards — FutBot Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0 fw-bold">Cards
+    <span class="badge bg-secondary ms-2">{{ total }}</span>
+  </h4>
+  <a href="{{ url_for('add_card') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Add Card
+  </a>
+</div>
+
+<!-- Filters -->
+<form method="get" class="card filter-bar mb-4 p-3">
+  <input type="hidden" name="sort"  value="{{ sort }}">
+  <input type="hidden" name="order" value="{{ order }}">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <input type="text" name="search" class="form-control form-control-sm"
+             placeholder="Search by name…" value="{{ search }}">
+    </div>
+    <div class="col-md-2">
+      <select name="rarity" class="form-select form-select-sm">
+        <option value="">All rarities</option>
+        {% for r in rarities %}
+          <option value="{{ r }}" {% if rarity == r %}selected{% endif %}>{{ r }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select name="club" class="form-select form-select-sm">
+        <option value="">All clubs</option>
+        {% for c in clubs %}
+          <option value="{{ c }}" {% if club == c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select name="nation" class="form-select form-select-sm">
+        <option value="">All nations</option>
+        {% for n in nations %}
+          <option value="{{ n }}" {% if nation == n %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select name="league" class="form-select form-select-sm">
+        <option value="">All leagues</option>
+        {% for l in leagues %}
+          <option value="{{ l }}" {% if league == l %}selected{% endif %}>{{ l }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-1 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+        <i class="bi bi-search"></i>
+      </button>
+      <a href="{{ url_for('cards') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x"></i>
+      </a>
+    </div>
+  </div>
+</form>
+
+<!-- Table -->
+<div class="table-responsive">
+  <table class="table table-hover align-middle card-table">
+    <thead>
+      <tr>
+        {{ sort_th('ID',        'card_id',     sort, order, search, rarity, club, nation, league) }}
+        {{ sort_th('Player ID', 'player_id',   sort, order, search, rarity, club, nation, league) }}
+        {{ sort_th('Name',      'name',        sort, order, search, rarity, club, nation, league) }}
+        {{ sort_th('OVR',    'overall',     sort, order, search, rarity, club, nation, league) }}
+        {{ sort_th('ATK',    'attack',      sort, order, search, rarity, club, nation, league) }}
+        {{ sort_th('DEF',    'defense',     sort, order, search, rarity, club, nation, league) }}
+        {{ sort_th('SPD',    'speed',       sort, order, search, rarity, club, nation, league) }}
+        <th>POS</th>
+        {{ sort_th('Club',   'club',        sort, order, search, rarity, club, nation, league) }}
+        {{ sort_th('Nation', 'nation',      sort, order, search, rarity, club, nation, league) }}
+        <th>League</th>
+        {{ sort_th('Rarity', 'card_rarity', sort, order, search, rarity, club, nation, league) }}
+        <th>Type</th>
+        <th style="width:80px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for card in cards %}
+      <tr>
+        <td class="text-muted small">{{ card['card_id'] }}</td>
+        <td class="text-muted small font-monospace">{{ card['player_id'] or '—' }}</td>
+        <td class="fw-semibold">{{ card['name'] }}</td>
+        <td><span class="badge ovr-badge ovr-{{ card['overall'] // 10 * 10 }}">{{ card['overall'] }}</span></td>
+        <td>{{ card['attack'] }}</td>
+        <td>{{ card['defense'] }}</td>
+        <td>{{ card['speed'] }}</td>
+        <td class="text-muted small">{{ card['position'] }}</td>
+        <td>{{ card['club'] }}</td>
+        <td>{{ card['nation'] }}</td>
+        <td class="text-muted small">{{ card['league'] }}</td>
+        <td><span class="rarity-badge rarity-{{ card['card_rarity'] | replace(' ', '-') | lower }}">{{ card['card_rarity'] }}</span></td>
+        <td class="text-muted small">{{ card['card_type'] }}</td>
+        <td>
+          <div class="d-flex gap-1 justify-content-end">
+            <a href="{{ url_for('edit_card', card_id=card['card_id']) }}"
+               class="btn btn-sm btn-outline-primary" title="Edit">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="post"
+                  action="{{ url_for('delete_card', card_id=card['card_id']) }}"
+                  onsubmit="return confirm('Delete {{ card['name'] }}?')">
+              <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="13" class="text-center text-muted py-5">No cards found.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

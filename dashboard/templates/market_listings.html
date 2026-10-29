@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Transfer Market — FutBot Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0 fw-bold">Transfer Market
+    {% if not table_missing %}
+      <span class="badge bg-secondary ms-2">{{ total }}</span>
+    {% endif %}
+  </h4>
+</div>
+
+{% if table_missing %}
+  <div class="alert alert-warning">
+    Table <code>market_listings</code> does not exist yet — run the bot once to create it.
+  </div>
+{% else %}
+
+<form method="get" class="card filter-bar mb-4 p-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <input type="text" name="search" class="form-control form-control-sm"
+             placeholder="Search by card or seller…" value="{{ search }}">
+    </div>
+    <div class="col-md-3">
+      <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="active"    {% if status_filter == 'active'    %}selected{% endif %}>Active</option>
+        <option value="sold"      {% if status_filter == 'sold'      %}selected{% endif %}>Sold</option>
+        <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+        <option value="expired"   {% if status_filter == 'expired'   %}selected{% endif %}>Expired</option>
+        <option value="all"       {% if status_filter == 'all'       %}selected{% endif %}>All History</option>
+      </select>
+    </div>
+    <div class="col-md-2 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+        <i class="bi bi-search"></i>
+      </button>
+      <a href="{{ url_for('market_listings') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x"></i>
+      </a>
+    </div>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle card-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Card</th>
+        <th>OVR</th>
+        <th>Rarity</th>
+        <th>Edn</th>
+        <th>Price</th>
+        <th>Seller</th>
+        <th>Buyer</th>
+        <th>Listed</th>
+        <th>Resolved</th>
+        <th>Status</th>
+        <th style="width:60px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="font-monospace small text-muted">{{ row['listing_id'] }}</td>
+        <td class="fw-semibold">{{ row['card_name'] or row['card_id'] }}</td>
+        <td>
+          {% if row['overall'] %}
+            <span class="badge ovr-badge ovr-{{ (row['overall'] // 10) * 10 }}">{{ row['overall'] }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if row['card_rarity'] %}
+            <span class="rarity-badge rarity-{{ row['card_rarity'] | replace(' ', '-') | lower }}">{{ row['card_rarity'] }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="small">#{{ row['edition'] }}</td>
+        <td class="fw-semibold">💰 {{ "{:,}".format(row['price']) }}</td>
+        <td class="text-muted small">{{ row['seller_name'] or row['seller_id'] }}</td>
+        <td class="text-muted small">{{ row['buyer_name'] or ('—' if not row['buyer_id'] else row['buyer_id']) }}</td>
+        <td class="text-muted small">{{ (row['listed_at'] or '')[:16] }}</td>
+        <td class="text-muted small">{{ (row['resolved_at'] or '')[:16] or '—' }}</td>
+        <td>
+          {% set s = row['status'] or 'active' %}
+          {% if s == 'active' %}
+            <span class="badge bg-success">{{ row['time_left'] }}</span>
+          {% elif s == 'sold' %}
+            <span class="badge bg-primary">Sold</span>
+          {% elif s == 'cancelled' %}
+            <span class="badge bg-secondary">Cancelled</span>
+          {% elif s == 'expired' %}
+            <span class="badge bg-danger">Expired</span>
+          {% else %}
+            <span class="badge bg-secondary">{{ s }}</span>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post"
+                action="{{ url_for('delete_market_listing', listing_id=row['listing_id']) }}"
+                onsubmit="return confirm('Hard-delete this listing record?')">
+            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete record">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="12" class="text-center text-muted py-5">
+          {% if search %}No listings matching "{{ search }}".{% else %}No listings found.{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,201 @@
+/* ── Base ──────────────────────────────────────────────── */
+:root {
+  --bg:       #0f1117;
+  --surface:  #1a1d27;
+  --border:   #2a2d3a;
+  --accent:   #5865f2;
+  --accent-h: #4752c4;
+  --text:     #e2e5f0;
+  --muted:    #7a7f9a;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 0.9rem;
+}
+
+/* ── Navbar ────────────────────────────────────────────── */
+.navbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.navbar-brand { color: var(--text) !important; font-size: 1rem; }
+.nav-link { color: var(--muted) !important; font-size: 0.85rem; }
+.nav-link:hover, .nav-link.active { color: var(--text) !important; }
+
+/* ── Cards / surfaces ──────────────────────────────────── */
+.card, .filter-bar, .form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+}
+
+/* ── Table ─────────────────────────────────────────────── */
+.card-table {
+  color: var(--text);
+  font-size: 0.83rem;
+}
+.card-table thead th {
+  background: var(--bg);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-color: var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.card-table tbody tr {
+  border-color: var(--border);
+}
+.card-table tbody tr:hover {
+  background: rgba(88, 101, 242, 0.07);
+}
+.card-table td { border-color: var(--border); vertical-align: middle; }
+
+/* ── OVR badges ────────────────────────────────────────── */
+.ovr-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 5px;
+}
+.ovr-90 { background: #f59e0b; color: #000; }
+.ovr-80 { background: #6366f1; color: #fff; }
+.ovr-70 { background: #3b82f6; color: #fff; }
+.ovr-60, .ovr-50, .ovr-40, .ovr-30, .ovr-20, .ovr-10, .ovr-0 {
+  background: var(--border); color: var(--muted);
+}
+
+/* ── Rarity badges ─────────────────────────────────────── */
+.rarity-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.rarity-standard    { background: #374151; color: #9ca3af; }
+.rarity-hero        { background: #1e3a5f; color: #60a5fa; }
+.rarity-icon        { background: #3b1f5e; color: #c084fc; }
+.rarity-euro-tott   { background: #1f3a2a; color: #4ade80; }
+.rarity-copa-tott   { background: #3a2a1f; color: #fb923c; }
+
+/* ── Sort links ────────────────────────────────────────── */
+.sort-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.78rem;
+}
+.sort-link:hover { color: var(--text); }
+.sort-link.active { color: var(--accent); font-weight: 600; }
+
+/* ── Forms ─────────────────────────────────────────────── */
+.form-control, .form-select {
+  background: var(--bg);
+  border-color: var(--border);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.form-control:focus, .form-select:focus {
+  background: var(--bg);
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 0 3px rgba(88,101,242,.2);
+}
+.form-control::placeholder { color: var(--muted); }
+.form-label { color: var(--muted); font-size: 0.78rem; font-weight: 600;
+              text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+
+.stat-input { font-size: 1rem; font-weight: 700; text-align: center; }
+
+/* ── Buttons ───────────────────────────────────────────── */
+.btn-primary { background: var(--accent); border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-h); border-color: var(--accent-h); }
+.btn-outline-primary { color: var(--accent); border-color: var(--accent); }
+.btn-outline-primary:hover { background: var(--accent); color: #fff; }
+.btn-outline-secondary { color: var(--muted); border-color: var(--border); }
+.btn-outline-secondary:hover { background: var(--border); color: var(--text); }
+.btn-outline-danger { color: #f87171; border-color: #f87171; }
+.btn-outline-danger:hover { background: #f87171; color: #000; }
+
+/* ── Alerts ────────────────────────────────────────────── */
+.alert-success { background: #1a2e1a; border-color: #4ade80; color: #4ade80; }
+.alert-danger  { background: #2e1a1a; border-color: #f87171; color: #f87171; }
+.btn-close { filter: invert(1); }
+
+/* ── Sortable th links ─────────────────────────────────── */
+.th-sort {
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.th-sort:hover  { color: var(--text); }
+.th-sort.active { color: var(--accent); }
+
+/* ── Mode badge (navbar) ───────────────────────────────── */
+.nav-divider {
+  width: 1px; background: var(--border);
+  margin: 4px 6px; align-self: stretch;
+}
+.mode-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  text-decoration: none;
+  letter-spacing: .03em;
+  white-space: nowrap;
+}
+.mode-badge.mode-local  { background: rgba(59,130,246,.15); color: #60a5fa; }
+.mode-badge.mode-online { background: rgba(74,222,128,.15); color: #4ade80; }
+.mode-badge:hover       { opacity: .85; }
+
+/* ── Settings page ─────────────────────────────────────── */
+.section-heading {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+.mode-option {
+  flex: 1;
+  cursor: pointer;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  text-align: center;
+  transition: border-color .15s, background .15s;
+}
+.mode-option input[type="radio"] { display: none; }
+.mode-option.selected {
+  border-color: var(--accent);
+  background: rgba(88,101,242,.08);
+}
+.mode-option:hover { border-color: var(--accent); }
+.mode-icon { font-size: 1.4rem; margin-bottom: 4px; color: var(--accent); }
+.mode-label { font-weight: 700; font-size: .9rem; }
+.mode-desc  { font-size: .75rem; color: var(--muted); }
+
+/* spinner for test button */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { display: inline-block; animation: spin .8s linear infinite; }
+
+/* ── Misc ──────────────────────────────────────────────── */
+.font-monospace { font-family: 'Consolas', monospace; font-size: 0.8rem; }
+.badge.bg-secondary { background: var(--border) !important; color: var(--muted); }

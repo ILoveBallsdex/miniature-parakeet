@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Settings — FutBot Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <h4 class="mb-0 fw-bold">Settings</h4>
+</div>
+
+<div class="row g-4" style="max-width: 700px;">
+
+  <!-- Mode & API form -->
+  <div class="col-12">
+    <form method="post" id="settings-form">
+      <div class="card form-card p-4">
+
+        <h6 class="section-heading mb-3">Database Mode</h6>
+        <div class="d-flex gap-3 mb-4">
+          <label class="mode-option {% if cfg.mode == 'local' %}selected{% endif %}">
+            <input type="radio" name="mode" value="local"
+                   {% if cfg.mode == 'local' %}checked{% endif %}
+                   onchange="toggleApiFields()">
+            <div class="mode-icon"><i class="bi bi-hdd-fill"></i></div>
+            <div class="mode-label">Local</div>
+            <div class="mode-desc">Direct SQLite on this machine</div>
+          </label>
+          <label class="mode-option {% if cfg.mode == 'online' %}selected{% endif %}">
+            <input type="radio" name="mode" value="online"
+                   {% if cfg.mode == 'online' %}checked{% endif %}
+                   onchange="toggleApiFields()">
+            <div class="mode-icon"><i class="bi bi-cloud-fill"></i></div>
+            <div class="mode-label">Online</div>
+            <div class="mode-desc">Live DB via API on hidencloud</div>
+          </label>
+        </div>
+
+        <div id="api-fields" style="display: {% if cfg.mode == 'online' %}block{% else %}none{% endif %}">
+          <h6 class="section-heading mb-3">Online API Settings</h6>
+          <div class="row g-3 mb-3">
+            <div class="col-md-8">
+              <label class="form-label">API URL</label>
+              <input type="text" name="api_url" class="form-control font-monospace"
+                     value="{{ cfg.api_url }}"
+                     placeholder="http://zeus.hidencloud.com:25535">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">API Key</label>
+              <input type="password" name="api_key" id="api-key-input"
+                     class="form-control font-monospace"
+                     value="{{ cfg.api_key }}"
+                     placeholder="secret key">
+            </div>
+          </div>
+
+          <!-- Connection test -->
+          <div class="d-flex align-items-center gap-3 mb-1">
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    onclick="testConnection()">
+              <i class="bi bi-wifi me-1"></i>Test Connection
+            </button>
+            <span id="test-result" class="small"></span>
+          </div>
+          <p class="text-muted small mt-2 mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            The bot API (Phase 2) must be deployed to hidencloud before Online mode works.
+            Local mode remains active until then.
+          </p>
+        </div>
+
+      </div>
+
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i>Save Settings
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Status card -->
+  <div class="col-12">
+    <div class="card form-card p-4">
+      <h6 class="section-heading mb-3">Current State</h6>
+      <table class="table table-sm mb-0 card-table">
+        <tbody>
+          <tr>
+            <td class="text-muted" style="width:140px">Mode</td>
+            <td>
+              <span class="mode-badge mode-{{ cfg.mode }} d-inline-flex">
+                {% if cfg.mode == 'online' %}
+                  <i class="bi bi-cloud-fill me-1"></i>Online
+                {% else %}
+                  <i class="bi bi-hdd-fill me-1"></i>Local
+                {% endif %}
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <td class="text-muted">Local DB path</td>
+            <td class="font-monospace small">{{ local_db }}</td>
+          </tr>
+          {% if cfg.mode == 'online' %}
+          <tr>
+            <td class="text-muted">API URL</td>
+            <td class="font-monospace small">{{ cfg.api_url or '—' }}</td>
+          </tr>
+          <tr>
+            <td class="text-muted">API Key</td>
+            <td class="text-muted small">{{ '••••••••' if cfg.api_key else 'not set' }}</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleApiFields() {
+  const online = document.querySelector('input[name="mode"][value="online"]').checked;
+  document.getElementById('api-fields').style.display = online ? 'block' : 'none';
+  // Update visual selection
+  document.querySelectorAll('.mode-option').forEach(el => {
+    el.classList.toggle('selected', el.querySelector('input').checked);
+  });
+}
+
+async function testConnection() {
+  const btn    = event.target.closest('button');
+  const result = document.getElementById('test-result');
+  const apiUrl = document.querySelector('input[name="api_url"]').value;
+  const apiKey = document.getElementById('api-key-input').value;
+
+  btn.disabled = true;
+  result.innerHTML = '<span class="text-muted"><i class="bi bi-arrow-repeat spin me-1"></i>Testing…</span>';
+
+  try {
+    const res = await fetch('/settings/test', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ api_url: apiUrl, api_key: apiKey }),
+    });
+    const data = await res.json();
+    result.innerHTML = data.ok
+      ? `<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>${data.msg}</span>`
+      : `<span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>${data.msg}</span>`;
+  } catch (e) {
+    result.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+{% endblock %}

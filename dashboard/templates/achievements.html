@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Achievements — FutBot Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0 fw-bold">Achievements
+    <span class="badge bg-secondary ms-2">{{ total }}</span>
+  </h4>
+  {% if not table_missing %}
+  <a href="{{ url_for('add_achievement') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Add Achievement
+  </a>
+  {% endif %}
+</div>
+
+{% if table_missing %}
+  <div class="alert alert-danger">
+    Table <code>achievements</code> does not exist yet — run the bot once to create it.
+  </div>
+{% else %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle card-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Title</th>
+        <th>Description</th>
+        <th style="width:100px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="text-muted small">{{ row['achievement_id'] }}</td>
+        <td class="fw-semibold">{{ row['title'] }}</td>
+        <td class="text-muted">{{ row['description'] }}</td>
+        <td>
+          <div class="d-flex gap-1 justify-content-end">
+            <a href="{{ url_for('edit_achievement', achievement_id=row['achievement_id']) }}"
+               class="btn btn-sm btn-outline-primary" title="Edit">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="post"
+                  action="{{ url_for('delete_achievement', achievement_id=row['achievement_id']) }}"
+                  onsubmit="return confirm('Delete achievement &quot;{{ row['title'] }}&quot;?')">
+              <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center text-muted py-5">No achievements defined yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
