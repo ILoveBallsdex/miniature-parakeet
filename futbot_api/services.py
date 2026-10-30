@@ -462,8 +462,8 @@ def select_battle_deck(battle_id: str, user_id: int, deck_name: str):
         if deck is None:
             raise GameError("Deck not found.", 404)
         card_ids = [int(value) for value in (deck["cards"] or "").split(",") if value.strip().isdigit()]
-        if len(card_ids) != 5:
-            raise GameError("Battle decks must contain exactly 5 cards.", 409)
+        if len(card_ids) != 5 or len(set(card_ids)) != 5:
+            raise GameError("Battle decks must contain exactly 5 different cards.", 409)
         owned = db.execute(
             f"SELECT COUNT(DISTINCT card_id) AS n FROM inventories WHERE user_id = ? AND card_id IN ({','.join('?' for _ in card_ids)})",
             (user_id, *card_ids),
@@ -623,7 +623,8 @@ def choose_battle_card(battle_id: str, user_id: int, card_id: int):
         state[card_key] = card_id
         if state["p1_card"] is not None and state["p2_card"] is not None:
             state = _resolve_battle_round(db, row, state)
-        db.execute("UPDATE battles SET state_json = ?, updated_at = ? WHERE battle_id = ?", (json.dumps(state), datetime.utcnow().isoformat(), battle_id))
+        new_status = "completed" if state["phase"] == "GAME_OVER" else "active"
+        db.execute("UPDATE battles SET status = ?, state_json = ?, updated_at = ? WHERE battle_id = ?", (new_status, json.dumps(state), datetime.utcnow().isoformat(), battle_id))
         row = _battle_row(db, battle_id)
     return _battle_payload(row)
 
