@@ -127,6 +127,11 @@ def init_database() -> None:
             p2_confirmed INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL,
             created_at TEXT NOT NULL, updated_at TEXT NOT NULL
         )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS drop_sessions (
+            drop_id TEXT PRIMARY KEY, card_id INTEGER NOT NULL,
+            owner_id INTEGER, created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL, status TEXT NOT NULL
+        )""")
         db.execute("""CREATE TABLE IF NOT EXISTS market_listings (
             listing_id INTEGER PRIMARY KEY AUTOINCREMENT, seller_id INTEGER,
             card_id INTEGER, edition INTEGER DEFAULT 1, trade_count INTEGER DEFAULT 0,
