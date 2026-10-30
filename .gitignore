@@ -6,3 +6,12 @@ CLAUDE.md
 .claude/
 dashboard/.config.json
 activity.md
+
+# Python API development/runtime
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+futbot_api.db
+futbot_api.db-wal
+futbot_api.db-shm
