@@ -141,7 +141,7 @@ class FutBotServiceTests(unittest.TestCase):
         image_path = os.path.join(self.temp_dir.name, "card.png")
         Image.new("RGBA", (500, 700), (20, 120, 60, 255)).save(image_path)
         rendered = generate_minted_card(image_path, None, "Test User", "#1/5")
-        self.assertTrue(rendered.startswith(b"\\x89PNG\\r\\n\\x1a\\n"))
+        self.assertTrue(rendered.startswith(b"\x89PNG\r\n\x1a\n"))
 
     def test_market_escrow_and_purchase(self):
         self.add_owned_card(123, 1)
