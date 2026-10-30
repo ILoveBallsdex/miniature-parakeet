@@ -44,6 +44,7 @@ on failure.
 | POST | `/api/v1/players/{user_id}/decks` | Save a five-card deck |
 | GET | `/api/v1/players/{user_id}/achievements` | Achievement definitions and unlock status |
 | POST | `/api/v1/players/{user_id}/title` | Equip an unlocked title |
+| POST | `/api/v1/players/{user_id}/secrets/{secret}` | Claim one of the six one-time secret card rewards |
 | POST | `/api/v1/players/{user_id}/starter-pack` | Claim the 10-card starter pack |
 | POST | `/api/v1/players/{user_id}/daily/claim` | Claim daily coins/streak and receive two card choices |
 | POST | `/api/v1/players/{user_id}/daily/collect` | Collect one of the pending daily cards |
@@ -104,6 +105,9 @@ on failure.
 | POST | `/api/v1/friends/requests/{request_id}/decline` | Decline a friend request |
 | POST | `/api/v1/friends/remove` | Remove a friend |
 | GET | `/api/v1/leaderboards/{stat}` | Global or selected-user leaderboard |
+| POST | `/api/v1/admin/coins` | Admin-only coin grant |
+| POST | `/api/v1/admin/cards/give` | Admin-only card grant |
+| POST | `/api/v1/admin/cards/remove` | Admin-only card removal |
 
 The existing Node.js bot will own Discord commands, embeds, buttons, menus,
 timers and scheduling. Python owns game rules, validation, and database writes.
@@ -198,14 +202,15 @@ card image route only serves files inside this configured directory.
 - Attach a persistent volume and point `FUTBOT_DB_PATH` and `FUTBOT_ASSET_DIR`
   to paths on that volume.
 - Set `FUTBOT_API_KEY` as a Railway secret variable.
+- Set `FUTBOT_ADMIN_IDS` to the comma-separated Discord IDs allowed to use
+  the admin endpoints.
 - Do not set or expose the Discord bot token in the Python API service.
 - Do not connect the Node.js bot until the API and asset migration are tested.
 
 ## Remaining work before connecting Node.js
 
-- Admin permission and management endpoints.
-- Achievement unlock triggers and secret command behavior.
-- Full end-to-end API tests and reconciliation against every original command.
+- Add end-to-end API tests and reconcile each original command against the new routes.
+- Port remaining presentation-only commands (help, about, changelog, facts and suggestions) to the Node.js bot.
 - Verify card images and any other local assets.
 - Build the Node.js HTTP client and replace FutBot Discord presentation with
   Node.js embeds/buttons/menus.
