@@ -129,15 +129,64 @@ def update_catalog_card(card_id: int, payload: dict):
 
 
 def delete_catalog_card(card_id: int):
+    """Permanently remove a catalog card and clean up every saved reference to it."""
     with transaction() as db:
-        if not db.execute("SELECT 1 FROM cards WHERE card_id = ?", (card_id,)).fetchone():
+        card = db.execute("SELECT card_id FROM cards WHERE card_id = ?", (card_id,)).fetchone()
+        if card is None:
             raise GameError("Card not found.", 404)
-        owned = db.execute("SELECT COUNT(*) AS n FROM inventories WHERE card_id = ?", (card_id,)).fetchone()["n"]
-        if owned:
-            raise GameError(f"Cannot delete this card yet: {owned} copy/copies are owned by players. Remove those copies first.", 409)
-        db.execute("DELETE FROM wishlists WHERE card_id = ?", (card_id,))
+
+        # Remove every owned copy, then remove the card from all saved lineups.
+        inventory_result = db.execute("DELETE FROM inventories WHERE card_id = ?", (card_id,))
+        lineup_count = 0
+        decks = db.execute("SELECT rowid, cards FROM decks").fetchall()
+        for deck in decks:
+            card_ids = [value.strip() for value in (deck["cards"] or "").split(",") if value.strip()]
+            filtered = [value for value in card_ids if value != str(card_id)]
+            if len(filtered) != len(card_ids):
+                db.execute("UPDATE decks SET cards = ? WHERE rowid = ?", (",".join(filtered), deck["rowid"]))
+                lineup_count += 1
+
+        # Clear other persisted references so deleted cards cannot appear in
+        # wishlists, pending rewards, marketplace listings, drops, or trades.
+        wishlist_result = db.execute("DELETE FROM wishlists WHERE card_id = ?", (card_id,))
+        market_result = db.execute("DELETE FROM market_listings WHERE card_id = ?", (card_id,))
+        drop_result = db.execute("DELETE FROM drop_sessions WHERE card_id = ?", (card_id,))
+        trade_result = db.execute(
+            "DELETE FROM trade_offers WHERE sender_card_id = ? OR recipient_card_id = ?",
+            (card_id, card_id),
+        )
+
+        pending_removed = 0
+        pending_rows = db.execute("SELECT user_id, card_ids FROM pending_daily_rewards").fetchall()
+        for pending in pending_rows:
+            try:
+                choices = json.loads(pending["card_ids"])
+            except (TypeError, ValueError):
+                continue
+            filtered = [value for value in choices if value != card_id]
+            if len(filtered) != len(choices):
+                pending_removed += 1
+                if filtered:
+                    db.execute(
+                        "UPDATE pending_daily_rewards SET card_ids = ? WHERE user_id = ?",
+                        (json.dumps(filtered), pending["user_id"]),
+                    )
+                else:
+                    db.execute("DELETE FROM pending_daily_rewards WHERE user_id = ?", (pending["user_id"],))
+
         db.execute("DELETE FROM cards WHERE card_id = ?", (card_id,))
-    return {"card_id": card_id, "deleted": True}
+
+    return {
+        "card_id": card_id,
+        "deleted": True,
+        "removed_inventory_copies": inventory_result.rowcount,
+        "updated_lineups": lineup_count,
+        "removed_wishlists": wishlist_result.rowcount,
+        "removed_market_listings": market_result.rowcount,
+        "removed_drops": drop_result.rowcount,
+        "removed_trade_offers": trade_result.rowcount,
+        "updated_pending_rewards": pending_removed,
+    }
 
 def ensure_player(user_id: int, name: str):
     if user_id <= 0 or not name.strip():
