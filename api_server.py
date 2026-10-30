@@ -92,6 +92,7 @@ async def status(request):
             "daily_rewards": True,
             "starter_pack": True,
             "card_drops": True,
+            "secret_rewards": True,
             "leaderboards": True,
             "battles": True,
             "trading": True,
@@ -409,6 +410,12 @@ async def battle_surrender(request):
     return success(services.surrender_battle(request.match_info["battle_id"], user_id))
 
 
+async def secret_reward(request):
+    user_id = int(request.match_info["user_id"])
+    secret_name = request.match_info["secret"]
+    return success(services.claim_secret_reward(user_id, secret_name))
+
+
 async def trade_up_eligible(request):
     user_id = int(request.match_info["user_id"])
     tier = request.match_info["tier"]
@@ -656,6 +663,7 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/battles/{battle_id}/next", battle_next_round)
     app.router.add_post("/api/v1/battles/{battle_id}/draw", battle_draw)
     app.router.add_post("/api/v1/battles/{battle_id}/surrender", battle_surrender)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/secrets/{secret}", secret_reward)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/trade-up/{tier}", trade_up_eligible)
     app.router.add_post("/api/v1/trade-up", trade_up_execute)
     app.router.add_get("/api/v1/market/listings", market_browse)
