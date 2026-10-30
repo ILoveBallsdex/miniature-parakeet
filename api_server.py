@@ -222,25 +222,77 @@ async def starter_pack(request):
 
 async def leaderboard(request):
     stat = request.match_info["stat"]
-    allowed = {
-        "battles_won", "battles_played", "battles_lost", "rounds_won",
-        "rounds_played", "rounds_lost", "coins", "cards_dropped", "cards_sold",
-    }
-    if stat not in allowed:
-        raise services.GameError("Unsupported leaderboard statistic.")
     try:
-        limit = max(1, min(int(request.query.get("limit", "10")), 100))
+        limit = int(request.query.get("limit", "10"))
+        raw_ids = request.query.get("user_ids")
+        user_ids = [int(value) for value in raw_ids.split(",") if value] if raw_ids is not None else None
     except ValueError:
-        raise services.GameError("limit must be an integer.")
-    from futbot_api.database import read_connection
-    with read_connection() as db:
-        rows = db.execute(
-            f"SELECT user_id, name, {stat} AS value FROM players ORDER BY {stat} DESC, name ASC LIMIT ?",
-            (limit,),
-        ).fetchall()
-    return success({"stat": stat, "entries": [
-        {"rank": index + 1, **dict(row)} for index, row in enumerate(rows)
-    ]})
+        raise services.GameError("limit and user_ids must contain valid integers.")
+    return success(services.leaderboard_entries(stat, limit, user_ids))
+
+
+async def player_stats(request):
+    return success(services.get_player_stats(int(request.match_info["user_id"])))
+
+
+async def player_wishlist(request):
+    user_id = int(request.match_info["user_id"])
+    return success({"cards": services.get_player_wishlist(user_id)})
+
+
+async def player_achievements(request):
+    user_id = int(request.match_info["user_id"])
+    return success({"achievements": services.get_achievements(user_id)})
+
+
+async def equip_title(request):
+    user_id = int(request.match_info["user_id"])
+    payload = await read_json(request)
+    try:
+        achievement_id = int(payload["achievement_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("achievement_id is required.")
+    return success(services.equip_title(user_id, achievement_id))
+
+
+async def friend_list(request):
+    user_id = int(request.match_info["user_id"])
+    return success({"friends": services.list_friends(user_id)})
+
+
+async def friend_requests(request):
+    user_id = int(request.match_info["user_id"])
+    return success({"requests": services.list_friend_requests(user_id)})
+
+
+async def friend_request_create(request):
+    payload = await read_json(request)
+    try:
+        requester_id = int(payload["requester_id"])
+        recipient_id = int(payload["recipient_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("requester_id and recipient_id are required.")
+    return success(services.add_friend_request(requester_id, recipient_id), 201)
+
+
+async def friend_request_resolve(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id is required.")
+    accept = request.match_info["decision"] == "accept"
+    return success(services.resolve_friend_request(int(request.match_info["request_id"]), user_id, accept))
+
+
+async def friend_remove(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+        friend_id = int(payload["friend_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id and friend_id are required.")
+    return success(services.remove_friend(user_id, friend_id))
 
 
 async def create_battle(request):
@@ -533,6 +585,15 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_get("/api/v1/cards/{card_id:\\d+}", card_detail)
     app.router.add_post("/api/v1/players/{user_id:\\d+}", create_or_update_player)
     app.router.add_get("/api/v1/players/{user_id:\\d+}", player_detail)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/stats", player_stats)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/wishlist", player_wishlist)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/achievements", player_achievements)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/title", equip_title)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/friends", friend_list)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/friend-requests", friend_requests)
+    app.router.add_post("/api/v1/friends/requests", friend_request_create)
+    app.router.add_post("/api/v1/friends/requests/{request_id:\\d+}/{decision:accept|decline}", friend_request_resolve)
+    app.router.add_post("/api/v1/friends/remove", friend_remove)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/inventory", player_inventory)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/packs", player_packs)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/decks", player_decks)
