@@ -7,6 +7,9 @@ bot.py, create a Discord client, or require a Discord bot token.
 
 import hmac
 import logging
+import asyncio
+import base64
+import binascii
 import os
 from pathlib import Path
 
@@ -15,6 +18,7 @@ from dotenv import load_dotenv
 
 from futbot_api import services
 from futbot_api.database import init_database
+from futbot_api.images import generate_minted_card
 
 load_dotenv()
 
@@ -122,11 +126,7 @@ async def card_detail(request):
     return success(card)
 
 
-async def card_image(request):
-    card = services.get_card(int(request.match_info["card_id"]))
-    if card is None:
-        raise services.GameError("Card not found.", 404)
-    image_path = card.get("image_path")
+def resolve_asset_path(image_path):
     if not image_path:
         raise services.GameError("This card does not have an image path.", 404)
     asset_root = Path(os.getenv("FUTBOT_ASSET_DIR", ".")).expanduser().resolve()
@@ -138,7 +138,64 @@ async def card_image(request):
         raise services.GameError("Card image path is outside the configured asset directory.", 403)
     if resolved.suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp", ".gif") or not resolved.is_file():
         raise services.GameError("Card image file was not found on the API service.", 404)
-    return web.FileResponse(resolved)
+    return resolved
+
+
+async def card_image(request):
+    card = services.get_card(int(request.match_info["card_id"]))
+    if card is None:
+        raise services.GameError("Card not found.", 404)
+    return web.FileResponse(resolve_asset_path(card.get("image_path")))
+
+
+async def card_weight(request):
+    search = request.query.get("search", "")
+    return success(services.get_card_weight(search))
+
+
+async def owned_card_copies(request):
+    user_id = int(request.match_info["user_id"])
+    card_id = int(request.match_info["card_id"])
+    copies = services.get_owned_card_copies(user_id, card_id)
+    if not copies:
+        raise services.GameError("This player does not own that card.", 404)
+    return success({"copies": copies, "count": len(copies)})
+
+
+async def minted_card_image(request):
+    user_id = int(request.match_info["user_id"])
+    card_id = int(request.match_info["card_id"])
+    payload = await read_json(request)
+    try:
+        edition = int(payload["edition"])
+        username = payload["username"]
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("edition and username are required.")
+    if not isinstance(username, str) or not username.strip():
+        raise services.GameError("username must be a non-empty string.")
+    avatar_bytes = None
+    encoded_avatar = payload.get("avatar_base64")
+    if encoded_avatar:
+        if not isinstance(encoded_avatar, str) or len(encoded_avatar) > 2_500_000:
+            raise services.GameError("avatar_base64 is invalid or too large.")
+        try:
+            avatar_bytes = base64.b64decode(encoded_avatar, validate=True)
+        except (ValueError, binascii.Error):
+            raise services.GameError("avatar_base64 is not valid base64.")
+    copies = services.get_owned_card_copies(user_id, card_id)
+    selected = next((copy for copy in copies if int(copy["edition"]) == edition), None)
+    if selected is None:
+        raise services.GameError("The selected card edition is not owned by this player.", 404)
+    path = resolve_asset_path(selected.get("image_path"))
+    total_copies = max(1, int(selected.get("copies") or 1))
+    edition_text = f"#{edition}/{total_copies}"
+    try:
+        rendered = await asyncio.to_thread(
+            generate_minted_card, str(path), avatar_bytes, username[:80], edition_text
+        )
+    except ValueError as exc:
+        raise services.GameError(str(exc), 500)
+    return web.Response(body=rendered, content_type="image/png")
 
 
 async def create_or_update_player(request):
@@ -679,13 +736,14 @@ async def save_player_deck(request):
 def create_app(api_key: str) -> web.Application:
     app = web.Application(
         middlewares=[error_middleware, api_key_middleware],
-        client_max_size=1024 * 1024,
+        client_max_size=4 * 1024 * 1024,
     )
     app["api_key"] = api_key
 
     app.router.add_get("/health", health)
     app.router.add_get("/api/v1/status", status)
     app.router.add_get("/api/v1/cards", card_list)
+    app.router.add_get("/api/v1/cards/weight", card_weight)
     app.router.add_get("/api/v1/cards/{card_id:\\d+}", card_detail)
     app.router.add_get("/api/v1/cards/{card_id:\\d+}/image", card_image)
     app.router.add_post("/api/v1/players/{user_id:\\d+}", create_or_update_player)
@@ -700,6 +758,8 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/friends/requests/{request_id:\\d+}/{decision:accept|decline}", friend_request_resolve)
     app.router.add_post("/api/v1/friends/remove", friend_remove)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/inventory", player_inventory)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/cards/{card_id:\\d+}/copies", owned_card_copies)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/cards/{card_id:\\d+}/minted", minted_card_image)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/packs", player_packs)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/decks", player_decks)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/daily/claim", daily_claim)
