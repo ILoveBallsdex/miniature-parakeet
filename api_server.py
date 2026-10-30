@@ -511,6 +511,113 @@ async def admin_remove_card(request):
     return success(services.admin_remove_card(user_id, card_id))
 
 
+
+def _store_admin_card_image(payload: dict, card_id: int):
+    encoded = payload.get("image_base64")
+    if not encoded:
+        return None
+    if not isinstance(encoded, str) or len(encoded) > 4_200_000:
+        raise services.GameError("Image is missing, invalid, or larger than 3 MB.")
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except (ValueError, binascii.Error):
+        raise services.GameError("image_base64 must be valid base64.")
+    if not raw or len(raw) > 3 * 1024 * 1024:
+        raise services.GameError("Image must be between 1 byte and 3 MB.")
+    try:
+        from PIL import Image
+        from io import BytesIO
+        image = Image.open(BytesIO(raw))
+        image.verify()
+        image_format = (image.format or "").upper()
+    except Exception:
+        raise services.GameError("The uploaded file is not a valid image.")
+    extensions = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp", "GIF": ".gif"}
+    extension = extensions.get(image_format)
+    if not extension:
+        raise services.GameError("Use a PNG, JPG, WEBP, or GIF image.")
+    asset_root = Path(os.getenv("FUTBOT_ASSET_DIR", ".")).expanduser().resolve()
+    card_dir = asset_root / "cards"
+    card_dir.mkdir(parents=True, exist_ok=True)
+    destination = card_dir / f"{card_id}{extension}"
+    destination.write_bytes(raw)
+    return f"cards/{card_id}{extension}"
+
+
+async def admin_create_catalog_card(request):
+    payload = await read_json(request)
+    try:
+        admin_id = int(payload["admin_id"])
+        card_id = int(payload["card_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("admin_id and card_id are required integers.")
+    require_admin(admin_id)
+    image_path = _store_admin_card_image(payload, card_id)
+    if image_path:
+        payload["image_path"] = image_path
+    return success(services.create_catalog_card(payload), 201)
+
+
+async def admin_replace_catalog_card(request):
+    payload = await read_json(request)
+    try:
+        admin_id = int(payload["admin_id"])
+        card_id = int(request.match_info["card_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("admin_id and a valid card ID are required.")
+    require_admin(admin_id)
+    image_path = _store_admin_card_image(payload, card_id)
+    if image_path:
+        payload["image_path"] = image_path
+    payload.pop("image_base64", None)
+    return success(services.update_catalog_card(card_id, payload))
+
+
+async def admin_delete_catalog_card(request):
+    payload = await read_json(request)
+    try:
+        admin_id = int(payload["admin_id"])
+        card_id = int(request.match_info["card_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("admin_id and a valid card ID are required.")
+    require_admin(admin_id)
+    return success(services.delete_catalog_card(card_id))
+
+
+async def admin_import_catalog_cards(request):
+    payload = await read_json(request)
+    try:
+        admin_id = int(payload["admin_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("admin_id is required.")
+    require_admin(admin_id)
+    cards = payload.get("cards")
+    if not isinstance(cards, list) or not cards or len(cards) > 50:
+        raise services.GameError("Provide between 1 and 50 cards in the cards array.")
+    results = []
+    for item in cards:
+        if not isinstance(item, dict):
+            raise services.GameError("Every cards entry must be an object.")
+        try:
+            card_id = int(item["card_id"])
+        except (KeyError, TypeError, ValueError):
+            raise services.GameError("Every card needs an integer card_id.")
+        image_path = _store_admin_card_image(item, card_id)
+        if image_path:
+            item["image_path"] = image_path
+        item.pop("image_base64", None)
+        try:
+            if item.pop("replace_existing", False):
+                result = services.update_catalog_card(card_id, item)
+                action = "replaced"
+            else:
+                result = services.create_catalog_card(item)
+                action = "created"
+        except services.GameError as exc:
+            raise services.GameError(f"Card {card_id}: {exc}", exc.status)
+        results.append({"card_id": card_id, "name": result.get("name"), "action": action})
+    return success({"imported": len(results), "cards": results}, 201)
+
 async def secret_reward(request):
     user_id = int(request.match_info["user_id"])
     secret_name = request.match_info["secret"]
@@ -736,7 +843,7 @@ async def save_player_deck(request):
 def create_app(api_key: str) -> web.Application:
     app = web.Application(
         middlewares=[error_middleware, api_key_middleware],
-        client_max_size=4 * 1024 * 1024,
+        client_max_size=16 * 1024 * 1024,
     )
     app["api_key"] = api_key
 
@@ -779,6 +886,10 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/admin/coins", admin_give_coins)
     app.router.add_post("/api/v1/admin/cards/give", admin_give_card)
     app.router.add_post("/api/v1/admin/cards/remove", admin_remove_card)
+    app.router.add_post("/api/v1/admin/cards/catalog", admin_create_catalog_card)
+    app.router.add_put("/api/v1/admin/cards/catalog/{card_id:\\d+}", admin_replace_catalog_card)
+    app.router.add_delete("/api/v1/admin/cards/catalog/{card_id:\\d+}", admin_delete_catalog_card)
+    app.router.add_post("/api/v1/admin/cards/import", admin_import_catalog_cards)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/secrets/{secret}", secret_reward)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/trade-up/{tier}", trade_up_eligible)
     app.router.add_post("/api/v1/trade-up", trade_up_execute)
