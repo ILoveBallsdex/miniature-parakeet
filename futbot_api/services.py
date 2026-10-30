@@ -1142,3 +1142,158 @@ def get_player_listings(user_id: int):
             (user_id,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+
+# ------------------------------- Friends --------------------------------------
+
+
+def add_friend_request(requester_id: int, recipient_id: int):
+    from datetime import datetime
+    if requester_id == recipient_id:
+        raise GameError("You cannot friend yourself.")
+    with transaction() as db:
+        for user_id in (requester_id, recipient_id):
+            if not db.execute("SELECT 1 FROM players WHERE user_id = ?", (user_id,)).fetchone():
+                raise GameError(f"Player {user_id} does not exist.", 404)
+        if db.execute("SELECT 1 FROM friendships WHERE user_id = ? AND friend_id = ?", (requester_id, recipient_id)).fetchone():
+            raise GameError("You are already friends.", 409)
+        if db.execute("SELECT 1 FROM friend_requests WHERE requester_id = ? AND recipient_id = ?", (requester_id, recipient_id)).fetchone():
+            raise GameError("You have already sent a friend request.", 409)
+        incoming = db.execute("SELECT request_id FROM friend_requests WHERE requester_id = ? AND recipient_id = ?", (recipient_id, requester_id)).fetchone()
+        if incoming:
+            db.execute("INSERT OR IGNORE INTO friendships (user_id, friend_id) VALUES (?, ?)", (requester_id, recipient_id))
+            db.execute("INSERT OR IGNORE INTO friendships (user_id, friend_id) VALUES (?, ?)", (recipient_id, requester_id))
+            db.execute("DELETE FROM friend_requests WHERE request_id = ?", (incoming["request_id"],))
+            return {"status": "accepted", "friend_id": recipient_id}
+        cur = db.execute(
+            "INSERT INTO friend_requests (requester_id, recipient_id, requested_at) VALUES (?, ?, ?)",
+            (requester_id, recipient_id, datetime.utcnow().isoformat()),
+        )
+        return {"status": "pending", "request_id": cur.lastrowid, "recipient_id": recipient_id}
+
+
+def list_friends(user_id: int):
+    with read_connection() as db:
+        rows = db.execute(
+            """SELECT f.friend_id, p.name, f.added_at
+            FROM friendships f LEFT JOIN players p ON p.user_id = f.friend_id
+            WHERE f.user_id = ? ORDER BY p.name""",
+            (user_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_friend_requests(user_id: int):
+    with read_connection() as db:
+        rows = db.execute(
+            """SELECT fr.request_id, fr.requester_id, p.name AS requester_name,
+                fr.requested_at, fr.notified
+            FROM friend_requests fr LEFT JOIN players p ON p.user_id = fr.requester_id
+            WHERE fr.recipient_id = ? ORDER BY fr.requested_at""",
+            (user_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def resolve_friend_request(request_id: int, recipient_id: int, accept: bool):
+    with transaction() as db:
+        row = db.execute("SELECT * FROM friend_requests WHERE request_id = ?", (request_id,)).fetchone()
+        if row is None:
+            raise GameError("Friend request not found.", 404)
+        if row["recipient_id"] != recipient_id:
+            raise GameError("Only the recipient can resolve this request.", 403)
+        if accept:
+            db.execute("INSERT OR IGNORE INTO friendships (user_id, friend_id) VALUES (?, ?)", (row["requester_id"], row["recipient_id"]))
+            db.execute("INSERT OR IGNORE INTO friendships (user_id, friend_id) VALUES (?, ?)", (row["recipient_id"], row["requester_id"]))
+        db.execute("DELETE FROM friend_requests WHERE request_id = ?", (request_id,))
+    return {"request_id": request_id, "status": "accepted" if accept else "declined"}
+
+
+def remove_friend(user_id: int, friend_id: int):
+    with transaction() as db:
+        cur = db.execute("DELETE FROM friendships WHERE user_id = ? AND friend_id = ?", (user_id, friend_id))
+        db.execute("DELETE FROM friendships WHERE user_id = ? AND friend_id = ?", (friend_id, user_id))
+        if cur.rowcount == 0:
+            raise GameError("You are not friends with this player.", 404)
+    return {"friend_id": friend_id, "status": "removed"}
+
+
+# -------------------------- Profiles and achievements -------------------------
+
+
+def get_player_stats(user_id: int):
+    player = get_player(user_id)
+    if player is None:
+        raise GameError("Player not found.", 404)
+    inventory = get_inventory(user_id)
+    rarity_counts = {}
+    for card in inventory:
+        rarity = card.get("card_rarity") or "Unknown"
+        rarity_counts[rarity] = rarity_counts.get(rarity, 0) + 1
+    player["inventory_count"] = len(inventory)
+    player["rarity_counts"] = rarity_counts
+    return player
+
+
+def get_player_wishlist(user_id: int):
+    with read_connection() as db:
+        rows = db.execute(
+            """SELECT c.* FROM wishlists w JOIN cards c ON c.card_id = w.card_id
+            WHERE w.user_id = ? ORDER BY c.overall DESC""",
+            (user_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_achievements(user_id: int):
+    with read_connection() as db:
+        rows = db.execute(
+            """SELECT a.achievement_id, a.title, a.description,
+                CASE WHEN ua.user_id IS NULL THEN 0 ELSE 1 END AS unlocked,
+                ua.date_earned
+            FROM achievements a LEFT JOIN user_achievements ua
+                ON ua.achievement_id = a.achievement_id AND ua.user_id = ?
+            ORDER BY a.achievement_id""",
+            (user_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def equip_title(user_id: int, achievement_id: int):
+    with transaction() as db:
+        row = db.execute(
+            """SELECT a.title FROM achievements a JOIN user_achievements ua
+            ON ua.achievement_id = a.achievement_id
+            WHERE ua.user_id = ? AND a.achievement_id = ?""",
+            (user_id, achievement_id),
+        ).fetchone()
+        if row is None:
+            raise GameError("You have not unlocked that title.", 403)
+        db.execute("UPDATE players SET display_title = ? WHERE user_id = ?", (row["title"], user_id))
+    return {"display_title": row["title"]}
+
+
+def leaderboard_entries(stat: str, limit: int = 10, user_ids=None):
+    allowed = {
+        "battles_won", "battles_played", "battles_lost", "battles_drawn",
+        "rounds_won", "rounds_played", "rounds_lost", "rounds_drawn",
+        "coins", "cards_dropped", "cards_sold",
+    }
+    if stat not in allowed:
+        raise GameError("Unsupported leaderboard statistic.")
+    limit = max(1, min(int(limit), 100))
+    with read_connection() as db:
+        params = []
+        where = ""
+        if user_ids is not None:
+            ids = list(dict.fromkeys(int(uid) for uid in user_ids))
+            if not ids:
+                return {"stat": stat, "entries": []}
+            where = f" WHERE user_id IN ({','.join('?' for _ in ids)})"
+            params.extend(ids)
+        rows = db.execute(
+            f"SELECT user_id, name, {stat} AS value FROM players{where} ORDER BY {stat} DESC, name ASC LIMIT ?",
+            (*params, limit),
+        ).fetchall()
+    return {"stat": stat, "entries": [{"rank": i + 1, **dict(row)} for i, row in enumerate(rows)]}
