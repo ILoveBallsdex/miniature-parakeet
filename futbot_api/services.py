@@ -1412,3 +1412,62 @@ def execute_trade_up(user_id: int, tier: str, inventory_row_ids: list[int]):
         db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (reward["card_id"],))
         db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)", (user_id, reward["card_id"], edition))
     return {"tier": tier, "sacrificed_inventory_row_ids": row_ids, "reward": dict(reward), "edition": edition}
+
+
+
+# -------------------------------- Secret rewards ------------------------------
+
+
+SECRET_REWARDS = {
+    "itscominghome": {
+        "flag": "itscominghome",
+        "card_ids": [10392, 10397, 10406, 10407, 10408, 10411, 10412, 10418, 10428, 10443, 10451, 10453, 10457],
+    },
+    "jogabonito": {
+        "flag": "jogabonito",
+        "card_ids": [10394, 10395, 10399, 10405, 10446, 10462, 10465, 10469],
+    },
+    "pineappleonpizza": {
+        "flag": "pineappleonpizza",
+        "card_ids": [10391, 10393, 10414, 10415, 10430, 10455, 10459, 10460],
+    },
+    "fubball": {
+        "flag": "mannschaft",
+        "card_ids": [10417, 10447, 10449, 10452, 10463],
+    },
+    "theflyingdutchmen": {
+        "flag": "theflyingdutchmen",
+        "card_ids": [10420, 10422, 10424, 10432, 10433, 10448, 10456],
+    },
+    "mayonnaise": {
+        "flag": "blues",
+        "card_ids": [10398, 10410, 10419, 10421, 10426, 10439, 10467],
+    },
+}
+
+
+def claim_secret_reward(user_id: int, secret_name: str):
+    secret = SECRET_REWARDS.get(secret_name)
+    if secret is None:
+        raise GameError("Unknown secret reward.", 404)
+    flag = secret["flag"]
+    with transaction() as db:
+        player = db.execute(f"SELECT {flag} FROM players WHERE user_id = ?", (user_id,)).fetchone()
+        if player is None:
+            raise GameError("Player not found. Create the player first.", 404)
+        if player[flag]:
+            raise GameError("You have already claimed this secret reward.", 409)
+        available = db.execute(
+            f"""SELECT * FROM cards WHERE card_id IN ({','.join('?' for _ in secret['card_ids'])})
+            AND card_id NOT IN (SELECT card_id FROM inventories WHERE user_id = ?)
+            ORDER BY RANDOM()""",
+            (*secret["card_ids"], user_id),
+        ).fetchall()
+        if not available:
+            raise GameError("No unowned cards remain in this secret reward pool.", 409)
+        card = available[0]
+        edition = int(card["copies"] or 0) + 1
+        db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card["card_id"],))
+        db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)", (user_id, card["card_id"], edition))
+        db.execute(f"UPDATE players SET {flag} = 1 WHERE user_id = ?", (user_id,))
+    return {"secret": secret_name, "card": dict(card), "edition": edition}
