@@ -334,7 +334,8 @@ def collect_daily(user_id: int, card_id: int):
             if card is None:
                 raise GameError("Card not found.", 404)
             copies = int(card["copies"] or 0)
-            edition = copies if copies else 1
+            edition = copies + 1
+            db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card_id,))
             db.execute(
                 "INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)",
                 (user_id, card_id, edition),
