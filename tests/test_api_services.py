@@ -106,6 +106,16 @@ class FutBotServiceTests(unittest.TestCase):
         self.assertEqual(services.get_player(123)["coins"], 90)
         self.assertEqual(services.get_player(456)["coins"], 110)
 
+    def test_trade_up(self):
+        for card_id in range(10, 15):
+            self.add_owned_card(123, card_id)
+        eligible = services.eligible_trade_up_cards(123, "common")
+        selected = [row["inventory_row_id"] for row in eligible[:5]]
+        result = services.execute_trade_up(123, "common", selected)
+        self.assertEqual(result["tier"], "common")
+        self.assertEqual(result["reward"]["card_rarity"], "Uncommon")
+        self.assertEqual(len(services.get_inventory(123)), 1)
+
     def test_battle_round(self):
         for card_id in [1, 2, 3, 10, 11]:
             self.add_owned_card(123, card_id)
