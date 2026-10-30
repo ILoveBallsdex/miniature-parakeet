@@ -324,10 +324,10 @@ def collect_daily(user_id: int, card_id: int):
         if card is None:
             raise GameError("Card not found.", 404)
         copies = int(card["copies"] or 0)
-        db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)", (user_id, card_id, copies + 1))
-        db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card_id,))
+        edition = copies if copies else 1
+        db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)", (user_id, card_id, edition))
         db.execute("DELETE FROM pending_daily_rewards WHERE user_id = ?", (user_id,))
-    return {"card": dict(card), "edition": copies + 1}
+    return {"card": dict(card), "edition": edition}
 
 
 def claim_starter_pack(user_id: int):
@@ -903,3 +903,71 @@ def get_exchange(session_id: str):
     result["p1_cards"] = json.loads(result["p1_cards"])
     result["p2_cards"] = json.loads(result["p2_cards"])
     return result
+
+
+
+# -------------------------------- Card drops --------------------------------
+
+
+def create_card_drop(owner_id: int | None = None):
+    import uuid
+    from datetime import datetime, timedelta
+    with transaction() as db:
+        if owner_id is not None and not db.execute("SELECT 1 FROM players WHERE user_id = ?", (owner_id,)).fetchone():
+            raise GameError("Drop owner is not registered.", 404)
+        weighted = _weighted_card_rows(db)
+        card = _weighted_choice(weighted)
+        if card is None:
+            raise GameError("No eligible cards are available to drop.", 409)
+        now = datetime.utcnow()
+        drop_id = uuid.uuid4().hex
+        expires = now + timedelta(seconds=120)
+        db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card["card_id"],))
+        db.execute(
+            "INSERT INTO drop_sessions (drop_id, card_id, owner_id, created_at, expires_at, status) VALUES (?, ?, ?, ?, ?, 'active')",
+            (drop_id, card["card_id"], owner_id, now.isoformat(), expires.isoformat()),
+        )
+    return {"drop_id": drop_id, "owner_id": owner_id, "card": dict(card), "owner_priority_seconds": 10 if owner_id is not None else 0, "expires_at": expires.isoformat()}
+
+
+def get_card_drop(drop_id: str):
+    with read_connection() as db:
+        row = db.execute(
+            "SELECT d.*, c.name, c.overall, c.attack, c.defense, c.speed, c.card_type, c.card_rarity, c.image_path FROM drop_sessions d JOIN cards c ON c.card_id = d.card_id WHERE d.drop_id = ?",
+            (drop_id,),
+        ).fetchone()
+    if row is None:
+        raise GameError("Drop not found.", 404)
+    return dict(row)
+
+
+def collect_card_drop(drop_id: str, user_id: int, username: str):
+    from datetime import datetime
+    with transaction() as db:
+        drop = db.execute("SELECT * FROM drop_sessions WHERE drop_id = ?", (drop_id,)).fetchone()
+        if drop is None:
+            raise GameError("Drop not found.", 404)
+        if drop["status"] != "active":
+            raise GameError("This drop has already been collected or expired.", 409)
+        now = datetime.utcnow()
+        expires = datetime.fromisoformat(drop["expires_at"])
+        if now >= expires:
+            db.execute("UPDATE drop_sessions SET status = 'expired' WHERE drop_id = ?", (drop_id,))
+            raise GameError("This drop has expired.", 410)
+        created = datetime.fromisoformat(drop["created_at"])
+        if drop["owner_id"] is not None and user_id != drop["owner_id"] and (now - created).total_seconds() < 10:
+            raise GameError("The drop is still reserved for its owner.", 403)
+        db.execute(
+            "INSERT INTO players (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = excluded.name",
+            (user_id, username.strip()[:100] or str(user_id)),
+        )
+        if db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (user_id, drop["card_id"])).fetchone():
+            raise GameError("You already own this card.", 409)
+        card = db.execute("SELECT * FROM cards WHERE card_id = ?", (drop["card_id"],)).fetchone()
+        db.execute(
+            "INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, COALESCE((SELECT copies FROM cards WHERE card_id = ?), 1))",
+            (user_id, drop["card_id"], drop["card_id"]),
+        )
+        db.execute("UPDATE players SET cards_dropped = COALESCE(cards_dropped, 0) + 1 WHERE user_id = ?", (user_id,))
+        db.execute("UPDATE drop_sessions SET status = 'collected' WHERE drop_id = ?", (drop_id,))
+    return {"drop_id": drop_id, "collected_by": user_id, "card": dict(card)}
