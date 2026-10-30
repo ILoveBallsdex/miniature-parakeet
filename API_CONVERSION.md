@@ -46,6 +46,7 @@ on failure.
 | GET | `/api/v1/players/{user_id}/decks` | Saved decks |
 | POST | `/api/v1/players/{user_id}/decks` | Create/update a five-card deck |
 | DELETE | `/api/v1/players/{user_id}/decks` | Delete a deck (JSON body contains name) |
+| DELETE | `/api/v1/players/{user_id}/decks` | Delete a deck (JSON body contains name) |
 | GET | `/api/v1/players/{user_id}/achievements` | Achievement definitions and unlock status |
 | POST | `/api/v1/players/{user_id}/title` | Equip an unlocked title |
 | POST | `/api/v1/players/{user_id}/secrets/{secret}` | Claim one of the six one-time secret card rewards |
