@@ -90,6 +90,7 @@ async def status(request):
             "decks": True,
             "daily_rewards": True,
             "starter_pack": True,
+            "card_drops": True,
             "leaderboards": True,
             "battles": True,
             "trading": True,
@@ -335,6 +336,33 @@ async def battle_surrender(request):
     return success(services.surrender_battle(request.match_info["battle_id"], user_id))
 
 
+async def create_drop(request):
+    payload = await read_json(request)
+    owner_id = payload.get("owner_id")
+    if owner_id is not None:
+        try:
+            owner_id = int(owner_id)
+        except (TypeError, ValueError):
+            raise services.GameError("owner_id must be an integer or null.")
+    return success(services.create_card_drop(owner_id), 201)
+
+
+async def drop_detail(request):
+    return success(services.get_card_drop(request.match_info["drop_id"]))
+
+
+async def drop_collect(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id is required.")
+    username = payload.get("username", str(user_id))
+    if not isinstance(username, str):
+        raise services.GameError("username must be a string.")
+    return success(services.collect_card_drop(request.match_info["drop_id"], user_id, username))
+
+
 async def create_trade(request):
     payload = await read_json(request)
     try:
@@ -464,6 +492,9 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/battles/{battle_id}/next", battle_next_round)
     app.router.add_post("/api/v1/battles/{battle_id}/draw", battle_draw)
     app.router.add_post("/api/v1/battles/{battle_id}/surrender", battle_surrender)
+    app.router.add_post("/api/v1/drops", create_drop)
+    app.router.add_get("/api/v1/drops/{drop_id}", drop_detail)
+    app.router.add_post("/api/v1/drops/{drop_id}/collect", drop_collect)
     app.router.add_post("/api/v1/trades", create_trade)
     app.router.add_get("/api/v1/trades/{trade_id}", trade_detail)
     app.router.add_post("/api/v1/trades/{trade_id}/accept", trade_accept)
