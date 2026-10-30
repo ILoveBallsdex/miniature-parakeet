@@ -58,9 +58,28 @@ def main():
         target.execute("BEGIN IMMEDIATE")
         target.execute("DELETE FROM cards")
         target.executemany(f"INSERT INTO cards ({quoted}) VALUES ({placeholders})", values)
+
+        # Achievement definitions are shared catalog data. Earned achievements
+        # remain player progress and are intentionally not copied.
+        achievement_exists = source.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='achievements'"
+        ).fetchone()
+        achievement_count = 0
+        if achievement_exists:
+            source_achievements = source.execute(
+                "SELECT achievement_id, title, description FROM achievements"
+            ).fetchall()
+            target.execute("DELETE FROM achievements")
+            target.executemany(
+                "INSERT INTO achievements (achievement_id, title, description) VALUES (?, ?, ?)",
+                [tuple(row) for row in source_achievements],
+            )
+            achievement_count = len(source_achievements)
+
         target.commit()
         print(f"Imported {len(values)} card catalog entries into {target_path}")
-        print("No player, inventory, currency, pack, deck, or match data was copied.")
+        print(f"Imported {achievement_count} achievement definitions.")
+        print("No player, inventory, currency, pack, deck, trade, earned-achievement, or match data was copied.")
     except Exception:
         target.rollback()
         raise
