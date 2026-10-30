@@ -1528,3 +1528,12 @@ def admin_remove_card(user_id: int, card_id: int):
             raise GameError("Player does not own this card.", 404)
         db.execute("DELETE FROM inventories WHERE rowid = ?", (row["rowid"],))
     return {"user_id": user_id, "card_id": card_id, "removed": True}
+
+
+
+def delete_deck(user_id: int, deck_name: str):
+    with transaction() as db:
+        cur = db.execute("DELETE FROM decks WHERE user_id = ? AND deck_name = ?", (user_id, deck_name))
+        if cur.rowcount == 0:
+            raise GameError("Deck not found.", 404)
+    return {"name": deck_name, "deleted": True}
