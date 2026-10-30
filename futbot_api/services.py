@@ -311,24 +311,38 @@ def claim_daily(user_id: int):
 
 
 def collect_daily(user_id: int, card_id: int):
+    from datetime import datetime
+    expired = False
     with transaction() as db:
-        pending = db.execute("SELECT card_ids FROM pending_daily_rewards WHERE user_id = ?", (user_id,)).fetchone()
+        pending = db.execute(
+            "SELECT card_ids, created_at FROM pending_daily_rewards WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
         if pending is None:
             raise GameError("There is no active daily reward to collect.", 409)
-        choices = json.loads(pending["card_ids"])
-        if card_id not in choices:
-            raise GameError("That card was not one of your daily reward choices.", 403)
-        if db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (user_id, card_id)).fetchone():
-            raise GameError("You already own this card.", 409)
-        card = db.execute("SELECT * FROM cards WHERE card_id = ?", (card_id,)).fetchone()
-        if card is None:
-            raise GameError("Card not found.", 404)
-        copies = int(card["copies"] or 0)
-        edition = copies if copies else 1
-        db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)", (user_id, card_id, edition))
-        db.execute("DELETE FROM pending_daily_rewards WHERE user_id = ?", (user_id,))
+        created = datetime.fromisoformat(pending["created_at"])
+        if (datetime.now() - created).total_seconds() > 120:
+            db.execute("DELETE FROM pending_daily_rewards WHERE user_id = ?", (user_id,))
+            expired = True
+        else:
+            choices = json.loads(pending["card_ids"])
+            if card_id not in choices:
+                raise GameError("That card was not one of your daily reward choices.", 403)
+            if db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (user_id, card_id)).fetchone():
+                raise GameError("You already own this card.", 409)
+            card = db.execute("SELECT * FROM cards WHERE card_id = ?", (card_id,)).fetchone()
+            if card is None:
+                raise GameError("Card not found.", 404)
+            copies = int(card["copies"] or 0)
+            edition = copies if copies else 1
+            db.execute(
+                "INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)",
+                (user_id, card_id, edition),
+            )
+            db.execute("DELETE FROM pending_daily_rewards WHERE user_id = ?", (user_id,))
+    if expired:
+        raise GameError("Your daily card selection has expired. Claim again tomorrow.", 410)
     return {"card": dict(card), "edition": edition}
-
 
 def claim_starter_pack(user_id: int):
     with transaction() as db:
