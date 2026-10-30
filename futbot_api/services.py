@@ -958,16 +958,6 @@ def collect_card_drop(drop_id: str, user_id: int, username: str):
             expired = True
         else:
             expired = False
-        if expired:
-            # Return from the transaction normally so the expired status is committed.
-            pass
-        if expired:
-            result = None
-        else:
-            result = True
-        if expired:
-            # No inventory or player changes are made for expired drops.
-            pass
         created = datetime.fromisoformat(drop["created_at"])
         if not expired and drop["owner_id"] is not None and user_id != drop["owner_id"] and (now - created).total_seconds() < 10:
             raise GameError("The drop is still reserved for its owner.", 403)
