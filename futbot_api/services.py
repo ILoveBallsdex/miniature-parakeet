@@ -363,3 +363,328 @@ def claim_starter_pack(user_id: int):
             db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card["card_id"],))
         db.execute("UPDATE players SET has_claimed_starter_pack = 1 WHERE user_id = ?", (user_id,))
     return {"cards": [dict(card) for card in selections], "count": len(selections)}
+
+
+
+# ------------------------------ Battle engine ------------------------------
+
+
+def _battle_row(db, battle_id):
+    row = db.execute("SELECT * FROM battles WHERE battle_id = ?", (battle_id,)).fetchone()
+    if row is None:
+        raise GameError("Battle not found.", 404)
+    return row
+
+
+def _battle_payload(row):
+    payload = dict(row)
+    payload["state"] = json.loads(payload.pop("state_json"))
+    return payload
+
+
+def create_battle(player1_id: int, player2_id: int):
+    import uuid
+    from datetime import datetime
+    if player1_id == player2_id:
+        raise GameError("You cannot battle yourself.")
+    with transaction() as db:
+        for user_id in (player1_id, player2_id):
+            if not db.execute("SELECT 1 FROM players WHERE user_id = ?", (user_id,)).fetchone():
+                raise GameError(f"Player {user_id} does not exist.", 404)
+        battle_id = uuid.uuid4().hex
+        now = datetime.utcnow().isoformat()
+        state = {
+            "phase": "INVITE", "p1_deck": [], "p2_deck": [],
+            "p1_used": [], "p2_used": [], "p1_wins": 0, "p2_wins": 0,
+            "draws": 0, "round": 1, "turn_player": player1_id,
+            "p1_action": None, "p2_action": None, "p1_card": None,
+            "p2_card": None, "draw_offers": [], "ready_players": [],
+            "last_result": None, "winner_id": None,
+        }
+        db.execute(
+            "INSERT INTO battles (battle_id, player1_id, player2_id, status, state_json, created_at, updated_at) VALUES (?, ?, ?, 'pending', ?, ?, ?)",
+            (battle_id, player1_id, player2_id, json.dumps(state), now, now),
+        )
+        row = _battle_row(db, battle_id)
+    return _battle_payload(row)
+
+
+def get_battle(battle_id: str):
+    with read_connection() as db:
+        row = db.execute("SELECT * FROM battles WHERE battle_id = ?", (battle_id,)).fetchone()
+    if row is None:
+        raise GameError("Battle not found.", 404)
+    return _battle_payload(row)
+
+
+def accept_battle(battle_id: str, user_id: int):
+    from datetime import datetime
+    with transaction() as db:
+        row = _battle_row(db, battle_id)
+        if user_id != row["player2_id"]:
+            raise GameError("Only the challenged player can accept this battle.", 403)
+        if row["status"] != "pending":
+            raise GameError("This battle is no longer pending.", 409)
+        state = json.loads(row["state_json"])
+        state["phase"] = "SETUP"
+        db.execute("UPDATE battles SET status = 'active', state_json = ?, updated_at = ? WHERE battle_id = ?", (json.dumps(state), datetime.utcnow().isoformat(), battle_id))
+        row = _battle_row(db, battle_id)
+    return _battle_payload(row)
+
+
+def decline_battle(battle_id: str, user_id: int):
+    from datetime import datetime
+    with transaction() as db:
+        row = _battle_row(db, battle_id)
+        if user_id != row["player2_id"]:
+            raise GameError("Only the challenged player can decline this battle.", 403)
+        if row["status"] != "pending":
+            raise GameError("This battle is no longer pending.", 409)
+        state = json.loads(row["state_json"])
+        state["phase"] = "DECLINED"
+        db.execute("UPDATE battles SET status = 'declined', state_json = ?, updated_at = ? WHERE battle_id = ?", (json.dumps(state), datetime.utcnow().isoformat(), battle_id))
+        row = _battle_row(db, battle_id)
+    return _battle_payload(row)
+
+
+def select_battle_deck(battle_id: str, user_id: int, deck_name: str):
+    from datetime import datetime
+    with transaction() as db:
+        row = _battle_row(db, battle_id)
+        if row["status"] != "active":
+            raise GameError("Battle is not active.", 409)
+        if user_id not in (row["player1_id"], row["player2_id"]):
+            raise GameError("You are not part of this battle.", 403)
+        state = json.loads(row["state_json"])
+        if state["phase"] != "SETUP":
+            raise GameError("Deck selection is already complete.", 409)
+        deck = db.execute("SELECT cards FROM decks WHERE user_id = ? AND deck_name = ?", (user_id, deck_name)).fetchone()
+        if deck is None:
+            raise GameError("Deck not found.", 404)
+        card_ids = [int(value) for value in (deck["cards"] or "").split(",") if value.strip().isdigit()]
+        if len(card_ids) != 5:
+            raise GameError("Battle decks must contain exactly 5 cards.", 409)
+        owned = db.execute(
+            f"SELECT COUNT(DISTINCT card_id) AS n FROM inventories WHERE user_id = ? AND card_id IN ({','.join('?' for _ in card_ids)})",
+            (user_id, *card_ids),
+        ).fetchone()["n"]
+        if owned != 5:
+            raise GameError("The selected deck contains cards the player no longer owns.", 409)
+        key = "p1_deck" if user_id == row["player1_id"] else "p2_deck"
+        state[key] = card_ids
+        if state["p1_deck"] and state["p2_deck"]:
+            state["phase"] = "ACTION"
+        db.execute("UPDATE battles SET state_json = ?, updated_at = ? WHERE battle_id = ?", (json.dumps(state), datetime.utcnow().isoformat(), battle_id))
+        row = _battle_row(db, battle_id)
+    return _battle_payload(row)
+
+
+def choose_battle_action(battle_id: str, user_id: int, action: str):
+    from datetime import datetime
+    action = action.lower()
+    if action not in ("attack", "defense", "speed"):
+        raise GameError("Action must be attack, defense, or speed.")
+    with transaction() as db:
+        row = _battle_row(db, battle_id)
+        if row["status"] != "active":
+            raise GameError("Battle is not active.", 409)
+        state = json.loads(row["state_json"])
+        if user_id not in (row["player1_id"], row["player2_id"]):
+            raise GameError("You are not part of this battle.", 403)
+        if state["phase"] != "ACTION":
+            raise GameError("Battle is not waiting for an action.", 409)
+        if user_id != state["turn_player"]:
+            raise GameError("It is not your turn.", 403)
+        if user_id == row["player1_id"]:
+            state["p1_action"] = action
+            state["p2_action"] = {"attack": "defense", "defense": "attack", "speed": "speed"}[action]
+        else:
+            state["p2_action"] = action
+            state["p1_action"] = {"attack": "defense", "defense": "attack", "speed": "speed"}[action]
+        state["phase"] = "CARD_SELECT"
+        db.execute("UPDATE battles SET state_json = ?, updated_at = ? WHERE battle_id = ?", (json.dumps(state), datetime.utcnow().isoformat(), battle_id))
+        row = _battle_row(db, battle_id)
+    return _battle_payload(row)
+
+
+def _resolve_battle_round(db, row, state):
+    p1_id, p2_id = row["player1_id"], row["player2_id"]
+    p1_card = db.execute("SELECT * FROM cards WHERE card_id = ?", (state["p1_card"],)).fetchone()
+    p2_card = db.execute("SELECT * FROM cards WHERE card_id = ?", (state["p2_card"],)).fetchone()
+    if p1_card is None or p2_card is None:
+        raise GameError("A selected battle card no longer exists.", 409)
+
+    if state["p1_action"] == "attack" and state["p2_action"] == "defense":
+        p1_value, p2_value = p1_card["attack"], p2_card["defense"]
+        stat = "Attack vs Defense"
+    elif state["p1_action"] == "defense" and state["p2_action"] == "attack":
+        p1_value, p2_value = p1_card["defense"], p2_card["attack"]
+        stat = "Defense vs Attack"
+    else:
+        p1_value, p2_value = p1_card["speed"], p2_card["speed"]
+        stat = "Speed vs Speed"
+
+    winner_id = None
+    if (p1_value or 0) > (p2_value or 0):
+        winner_id = p1_id
+        state["p1_wins"] += 1
+        result = f"Player {p1_id} wins with {stat}."
+    elif (p2_value or 0) > (p1_value or 0):
+        winner_id = p2_id
+        state["p2_wins"] += 1
+        result = f"Player {p2_id} wins with {stat}."
+    elif (p1_card["overall"] or 0) > (p2_card["overall"] or 0):
+        winner_id = p1_id
+        state["p1_wins"] += 1
+        result = f"Stats tied; player {p1_id} wins on overall."
+    elif (p2_card["overall"] or 0) > (p1_card["overall"] or 0):
+        winner_id = p2_id
+        state["p2_wins"] += 1
+        result = f"Stats tied; player {p2_id} wins on overall."
+    else:
+        state["draws"] += 1
+        result = "The round is a draw."
+
+    for uid, cid in ((p1_id, p1_card["card_id"]), (p2_id, p2_card["card_id"])):
+        db.execute("UPDATE players SET rounds_played = rounds_played + 1 WHERE user_id = ?", (uid,))
+        db.execute("UPDATE inventories SET rounds_played = rounds_played + 1 WHERE user_id = ? AND card_id = ?", (uid, cid))
+        db.execute("UPDATE cards SET total_rounds_played = COALESCE(total_rounds_played, 0) + 1 WHERE card_id = ?", (cid,))
+    if winner_id:
+        loser_id = p2_id if winner_id == p1_id else p1_id
+        winner_card_id = p1_card["card_id"] if winner_id == p1_id else p2_card["card_id"]
+        db.execute("UPDATE players SET rounds_won = rounds_won + 1 WHERE user_id = ?", (winner_id,))
+        db.execute("UPDATE players SET rounds_lost = rounds_lost + 1 WHERE user_id = ?", (loser_id,))
+        db.execute("UPDATE inventories SET rounds_won = rounds_won + 1 WHERE user_id = ? AND card_id = ?", (winner_id, winner_card_id))
+        db.execute("UPDATE cards SET total_rounds_won = COALESCE(total_rounds_won, 0) + 1 WHERE card_id = ?", (winner_card_id,))
+    else:
+        db.execute("UPDATE players SET rounds_drawn = COALESCE(rounds_drawn, 0) + 1 WHERE user_id IN (?, ?)", (p1_id, p2_id))
+
+    state["p1_used"].append(p1_card["card_id"])
+    state["p2_used"].append(p2_card["card_id"])
+    state["last_result"] = {
+        "text": result, "winner_id": winner_id,
+        "player1_card": dict(p1_card), "player2_card": dict(p2_card),
+        "player1_action": state["p1_action"], "player2_action": state["p2_action"],
+        "stat": stat,
+    }
+    state["phase"] = "GAME_OVER" if state["p1_wins"] >= 3 or state["p2_wins"] >= 3 or state["round"] == 5 else "RESULT"
+    if state["phase"] == "GAME_OVER":
+        _finish_battle(db, row, state, winner_id=(p1_id if state["p1_wins"] > state["p2_wins"] else p2_id if state["p2_wins"] > state["p1_wins"] else None), draw=(state["p1_wins"] == state["p2_wins"]))
+    state["p1_card"] = None
+    state["p2_card"] = None
+    return state
+
+
+def _finish_battle(db, row, state, winner_id=None, draw=False, surrendered_by=None):
+    p1_id, p2_id = row["player1_id"], row["player2_id"]
+    if state.get("settled"):
+        return
+    db.execute("UPDATE players SET battles_played = battles_played + 1 WHERE user_id IN (?, ?)", (p1_id, p2_id))
+    if draw:
+        db.execute("UPDATE players SET battles_drawn = battles_drawn + 1, coins = COALESCE(coins, 0) + 100 WHERE user_id IN (?, ?)", (p1_id, p2_id))
+    elif winner_id:
+        loser_id = p2_id if winner_id == p1_id else p1_id
+        db.execute("UPDATE players SET battles_won = battles_won + 1, coins = COALESCE(coins, 0) + 200 WHERE user_id = ?", (winner_id,))
+        db.execute("UPDATE players SET battles_lost = battles_lost + 1, coins = COALESCE(coins, 0) + 100 WHERE user_id = ?", (loser_id,))
+    if not surrendered_by:
+        for uid, deck_key in ((p1_id, "p1_deck"), (p2_id, "p2_deck")):
+            won = not draw and uid == winner_id
+            for cid in state[deck_key]:
+                db.execute("UPDATE inventories SET battles_played = battles_played + 1 WHERE user_id = ? AND card_id = ?", (uid, cid))
+                db.execute("UPDATE cards SET total_battles_played = COALESCE(total_battles_played, 0) + 1 WHERE card_id = ?", (cid,))
+                if won:
+                    db.execute("UPDATE inventories SET battles_won = battles_won + 1 WHERE user_id = ? AND card_id = ?", (uid, cid))
+                    db.execute("UPDATE cards SET total_battles_won = COALESCE(total_battles_won, 0) + 1 WHERE card_id = ?", (cid,))
+    state["settled"] = True
+    state["winner_id"] = winner_id
+    state["phase"] = "GAME_OVER"
+
+
+def choose_battle_card(battle_id: str, user_id: int, card_id: int):
+    from datetime import datetime
+    with transaction() as db:
+        row = _battle_row(db, battle_id)
+        if row["status"] != "active":
+            raise GameError("Battle is not active.", 409)
+        if user_id not in (row["player1_id"], row["player2_id"]):
+            raise GameError("You are not part of this battle.", 403)
+        state = json.loads(row["state_json"])
+        if state["phase"] != "CARD_SELECT":
+            raise GameError("Battle is not waiting for card selection.", 409)
+        deck_key = "p1_deck" if user_id == row["player1_id"] else "p2_deck"
+        used_key = "p1_used" if user_id == row["player1_id"] else "p2_used"
+        card_key = "p1_card" if user_id == row["player1_id"] else "p2_card"
+        if card_id not in state[deck_key] or card_id in state[used_key]:
+            raise GameError("Choose an unused card from your selected battle deck.", 403)
+        if state[card_key] is not None:
+            raise GameError("You have already selected a card this round.", 409)
+        if not db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (user_id, card_id)).fetchone():
+            raise GameError("You no longer own this card.", 409)
+        state[card_key] = card_id
+        if state["p1_card"] is not None and state["p2_card"] is not None:
+            state = _resolve_battle_round(db, row, state)
+        db.execute("UPDATE battles SET state_json = ?, updated_at = ? WHERE battle_id = ?", (json.dumps(state), datetime.utcnow().isoformat(), battle_id))
+        row = _battle_row(db, battle_id)
+    return _battle_payload(row)
+
+
+def ready_next_round(battle_id: str, user_id: int):
+    from datetime import datetime
+    with transaction() as db:
+        row = _battle_row(db, battle_id)
+        if row["status"] != "active":
+            raise GameError("Battle is not active.", 409)
+        if user_id not in (row["player1_id"], row["player2_id"]):
+            raise GameError("You are not part of this battle.", 403)
+        state = json.loads(row["state_json"])
+        if state["phase"] != "RESULT":
+            raise GameError("The battle is not waiting for the next round.", 409)
+        if user_id in state["ready_players"]:
+            raise GameError("You are already ready.", 409)
+        state["ready_players"].append(user_id)
+        if len(state["ready_players"]) == 2:
+            state["round"] += 1
+            state["p1_action"] = state["p2_action"] = None
+            state["p1_card"] = state["p2_card"] = None
+            state["ready_players"] = []
+            state["turn_player"] = row["player2_id"] if state["turn_player"] == row["player1_id"] else row["player1_id"]
+            state["phase"] = "ACTION"
+        db.execute("UPDATE battles SET state_json = ?, updated_at = ? WHERE battle_id = ?", (json.dumps(state), datetime.utcnow().isoformat(), battle_id))
+        row = _battle_row(db, battle_id)
+    return _battle_payload(row)
+
+
+def offer_battle_draw(battle_id: str, user_id: int):
+    from datetime import datetime
+    with transaction() as db:
+        row = _battle_row(db, battle_id)
+        if row["status"] != "active":
+            raise GameError("Battle is not active.", 409)
+        if user_id not in (row["player1_id"], row["player2_id"]):
+            raise GameError("You are not part of this battle.", 403)
+        state = json.loads(row["state_json"])
+        if user_id in state["draw_offers"]:
+            raise GameError("You already offered a draw.", 409)
+        state["draw_offers"].append(user_id)
+        if len(state["draw_offers"]) == 2:
+            _finish_battle(db, row, state, draw=True)
+            db.execute("UPDATE battles SET status = 'completed' WHERE battle_id = ?", (battle_id,))
+        db.execute("UPDATE battles SET state_json = ?, updated_at = ? WHERE battle_id = ?", (json.dumps(state), datetime.utcnow().isoformat(), battle_id))
+        row = _battle_row(db, battle_id)
+    return _battle_payload(row)
+
+
+def surrender_battle(battle_id: str, user_id: int):
+    from datetime import datetime
+    with transaction() as db:
+        row = _battle_row(db, battle_id)
+        if row["status"] != "active":
+            raise GameError("Battle is not active.", 409)
+        if user_id not in (row["player1_id"], row["player2_id"]):
+            raise GameError("You are not part of this battle.", 403)
+        state = json.loads(row["state_json"])
+        winner_id = row["player2_id"] if user_id == row["player1_id"] else row["player1_id"]
+        _finish_battle(db, row, state, winner_id=winner_id, surrendered_by=user_id)
+        db.execute("UPDATE battles SET status = 'completed', state_json = ?, updated_at = ? WHERE battle_id = ?", (json.dumps(state), datetime.utcnow().isoformat(), battle_id))
+        row = _battle_row(db, battle_id)
+    return _battle_payload(row)
