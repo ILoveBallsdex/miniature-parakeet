@@ -112,6 +112,21 @@ def init_database() -> None:
             state_json TEXT NOT NULL, created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS trade_offers (
+            trade_id TEXT PRIMARY KEY, sender_id INTEGER NOT NULL,
+            recipient_id INTEGER NOT NULL, sender_card_id INTEGER NOT NULL,
+            recipient_card_id INTEGER NOT NULL, status TEXT NOT NULL,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS exchange_sessions (
+            session_id TEXT PRIMARY KEY, player1_id INTEGER NOT NULL,
+            player2_id INTEGER NOT NULL, p1_cards TEXT NOT NULL,
+            p2_cards TEXT NOT NULL, p1_coins INTEGER NOT NULL DEFAULT 0,
+            p2_coins INTEGER NOT NULL DEFAULT 0, p1_locked INTEGER NOT NULL DEFAULT 0,
+            p2_locked INTEGER NOT NULL DEFAULT 0, p1_confirmed INTEGER NOT NULL DEFAULT 0,
+            p2_confirmed INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        )""")
         db.execute("""CREATE TABLE IF NOT EXISTS market_listings (
             listing_id INTEGER PRIMARY KEY AUTOINCREMENT, seller_id INTEGER,
             card_id INTEGER, edition INTEGER DEFAULT 1, trade_count INTEGER DEFAULT 0,
