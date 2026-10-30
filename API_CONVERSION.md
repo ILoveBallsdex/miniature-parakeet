@@ -7,47 +7,116 @@ Node.js Discord bot.
 
 - `miniature-parakeet`: Python game backend (this repository).
 - `iloveballsdex1234`: existing Node.js Discord bot; it is not changed by this work.
-- `main`: original Python Discord bot; leave it as the fallback until the migration is tested.
+- `main`: original Python Discord bot; keep it as the fallback until migration is tested.
 - `python-api-conversion`: all conversion work happens here.
 
 The API process does not import `bot.py`, start a Discord client, or require
 `DISCORD_TOKEN`.
 
-## Current API capabilities
+## Implemented API capabilities
 
-Authenticated routes use the `X-API-Key` header.
+All routes except `GET /health` require the `X-API-Key` header. JSON responses
+use `{"ok": true, "data": ...}` on success and `{"ok": false, "error": ...}`
+on failure.
+
+### Health and cards
 
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/health` | Public process health check |
-| GET | `/api/v1/status` | API status and implemented feature list |
+| GET | `/api/v1/status` | API status and feature flags |
 | GET | `/api/v1/cards` | Search/list the card catalog |
 | GET | `/api/v1/cards/{card_id}` | Card details |
-| POST | `/api/v1/players/{user_id}` | Create/update a player name |
-| GET | `/api/v1/players/{user_id}` | Player profile |
-| GET | `/api/v1/players/{user_id}/inventory` | Player inventory |
+| GET | `/api/v1/cards/{card_id}/image` | Safely serve a card image from the configured asset folder |
+
+### Players and collection
+
+| Method | Route | Purpose |
+|---|---|---|
+| POST | `/api/v1/players/{user_id}` | Create/update a player's display name |
+| GET | `/api/v1/players/{user_id}` | Player profile and wallet |
+| GET | `/api/v1/players/{user_id}/stats` | Stats and inventory rarity counts |
+| GET | `/api/v1/players/{user_id}/inventory` | Inventory, editions and card stats |
+| GET | `/api/v1/players/{user_id}/wishlist` | Wishlist |
+| POST | `/api/v1/players/{user_id}/wishlist/{card_id}` | Toggle a wishlist entry |
 | GET | `/api/v1/players/{user_id}/packs` | Unopened pack counts |
 | GET | `/api/v1/players/{user_id}/decks` | Saved decks |
 | POST | `/api/v1/players/{user_id}/decks` | Save a five-card deck |
-| POST | `/api/v1/players/{user_id}/wishlist/{card_id}` | Toggle wishlist entry |
+| GET | `/api/v1/players/{user_id}/achievements` | Achievement definitions and unlock status |
+| POST | `/api/v1/players/{user_id}/title` | Equip an unlocked title |
+| POST | `/api/v1/players/{user_id}/starter-pack` | Claim the 10-card starter pack |
+| POST | `/api/v1/players/{user_id}/daily/claim` | Claim daily coins/streak and receive two card choices |
+| POST | `/api/v1/players/{user_id}/daily/collect` | Collect one of the pending daily cards |
+
+### Economy, packs and drops
+
+| Method | Route | Purpose |
+|---|---|---|
 | GET | `/api/v1/packs/catalog` | Pack names and prices |
 | POST | `/api/v1/packs/buy` | Buy a pack with coins |
-| POST | `/api/v1/packs/open` | Open a pack and receive cards |
-| POST | `/api/v1/inventory/sell` | Sell selected cards |
+| POST | `/api/v1/packs/open` | Open a pack and receive card(s) |
+| POST | `/api/v1/inventory/sell` | Sell selected cards for coins |
+| POST | `/api/v1/trade-up` | Sacrifice five cards for a higher-rarity reward |
+| GET | `/api/v1/players/{user_id}/trade-up/{tier}` | List eligible trade-up copies |
+| POST | `/api/v1/drops` | Create a timed card drop |
+| GET | `/api/v1/drops/{drop_id}` | Read a drop |
+| POST | `/api/v1/drops/{drop_id}/collect` | Collect a drop with owner-priority checks |
 
-Game mutations use SQLite transactions. The API validates ownership and
-balances before changing player data. Battles, player-to-player trading, and
-the marketplace are not yet exposed; they must be implemented and tested
-before the Node.js bot switches to the API.
+### Battles and trading
+
+| Method | Route | Purpose |
+|---|---|---|
+| POST | `/api/v1/battles` | Create a battle challenge |
+| GET | `/api/v1/battles/{battle_id}` | Read battle state |
+| POST | `/api/v1/battles/{battle_id}/accept` | Accept a challenge |
+| POST | `/api/v1/battles/{battle_id}/decline` | Decline a challenge |
+| POST | `/api/v1/battles/{battle_id}/decks` | Select a saved five-card deck |
+| POST | `/api/v1/battles/{battle_id}/action` | Select attack, defense or speed |
+| POST | `/api/v1/battles/{battle_id}/card` | Select a card for the round |
+| POST | `/api/v1/battles/{battle_id}/next` | Ready up for the next round |
+| POST | `/api/v1/battles/{battle_id}/draw` | Offer/accept a draw |
+| POST | `/api/v1/battles/{battle_id}/surrender` | Surrender |
+| POST | `/api/v1/trades` | Create a one-for-one trade offer |
+| GET | `/api/v1/trades/{trade_id}` | Read a trade offer |
+| POST | `/api/v1/trades/{trade_id}/accept` | Accept a trade |
+| POST | `/api/v1/trades/{trade_id}/decline` | Decline a trade |
+| POST | `/api/v1/exchanges` | Create an advanced card/coin exchange |
+| GET | `/api/v1/exchanges/{session_id}` | Read an exchange |
+| PUT | `/api/v1/exchanges/{session_id}/offer` | Replace your offer |
+| POST | `/api/v1/exchanges/{session_id}/lock` | Lock your offer |
+| POST | `/api/v1/exchanges/{session_id}/confirm` | Confirm a mutually locked exchange |
+| POST | `/api/v1/exchanges/{session_id}/cancel` | Cancel an exchange |
+
+### Market, friends and rankings
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/api/v1/market/listings` | Browse active listings |
+| POST | `/api/v1/market/listings` | List a card copy in escrow |
+| POST | `/api/v1/market/listings/{listing_id}/buy` | Buy a listing |
+| POST | `/api/v1/market/listings/{listing_id}/cancel` | Unlist and return a card |
+| GET | `/api/v1/players/{user_id}/market/listings` | View your active listings |
+| POST | `/api/v1/market/expire` | Expire due listings and return escrowed cards |
+| POST | `/api/v1/friends/requests` | Send a friend request |
+| GET | `/api/v1/players/{user_id}/friends` | List friends |
+| GET | `/api/v1/players/{user_id}/friend-requests` | List incoming requests |
+| POST | `/api/v1/friends/requests/{request_id}/accept` | Accept a friend request |
+| POST | `/api/v1/friends/requests/{request_id}/decline` | Decline a friend request |
+| POST | `/api/v1/friends/remove` | Remove a friend |
+| GET | `/api/v1/leaderboards/{stat}` | Global or selected-user leaderboard |
+
+The existing Node.js bot will own Discord commands, embeds, buttons, menus,
+timers and scheduling. Python owns game rules, validation, and database writes.
+The API is not connected to the Node.js bot yet.
 
 ## Local setup
 
-Use Python 3.10+ for the new API process.
+Use Python 3.10+ for the API process.
 
 ```bash
 python -m venv .venv
 # Windows:
-.venv\\Scripts\\activate
+.venv\Scripts\activate
 # macOS/Linux:
 source .venv/bin/activate
 
@@ -59,6 +128,7 @@ Create a local `.env` file (never commit it):
 ```ini
 FUTBOT_API_KEY=put_a_long_random_secret_here
 FUTBOT_DB_PATH=./futbot_api.db
+FUTBOT_ASSET_DIR=./assets
 API_HOST=127.0.0.1
 API_PORT=8000
 ```
@@ -69,56 +139,74 @@ Start the API:
 python api_server.py
 ```
 
-Check process health:
+Health check:
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-Check authenticated status:
+Authenticated status check:
 
 ```bash
 curl -H "X-API-Key: put_a_long_random_secret_here" http://127.0.0.1:8000/api/v1/status
 ```
 
-Run service tests:
+Run tests:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-## Import the existing card catalog
+GitHub Actions also runs these tests on pushes to this branch.
 
-The old `cards_game.db` is not stored in GitHub. Once the local API has been
-tested, copy only the card catalog into a separate API database:
+## Import the new database
+
+The old `cards_game.db` is not stored in GitHub. Create a separate API database
+and copy the card catalog from your local database:
 
 ```bash
 python scripts/import_card_catalog.py --source ./cards_game.db --target ./futbot_api.db
 ```
 
-This script copies rows from the `cards` table only. It does not copy players,
-inventories, coins, packs, decks, trades, or match history. It refuses to run
-if source and target are the same file.
+The import script:
+- Copies card identity, stats, rarity, type, league, nation and image paths.
+- Copies achievement definitions.
+- Resets destination player accounts, inventories, coins, packs, decks, trades,
+  friendships, market listings and battle history.
+- Resets card copy counts, wishlist counts and global battle counters.
+- Never modifies the source database and refuses source = target.
 
-Keep a backup of the original database. Do not overwrite it.
+Keep your original database as a backup.
 
-## Database and Railway
+## Card images
 
-- Set `FUTBOT_DB_PATH` to a path on a Railway persistent volume.
+The repository does not contain the card image files. The database only stores
+image paths. Check that the files are present on your computer:
+
+```bash
+python scripts/verify_card_assets.py --database ./cards_game.db --asset-root .
+```
+
+Before deployment, copy the referenced image files into the Python service's
+persistent asset folder and set `FUTBOT_ASSET_DIR` to that folder. The API's
+card image route only serves files inside this configured directory.
+
+## Railway deployment (later)
+
+- Deploy this repository as a **separate** Railway service.
+- Set the start command to `python api_server.py`.
+- Attach a persistent volume and point `FUTBOT_DB_PATH` and `FUTBOT_ASSET_DIR`
+  to paths on that volume.
 - Set `FUTBOT_API_KEY` as a Railway secret variable.
-- Set the service start command to `python api_server.py`.
 - Do not set or expose the Discord bot token in the Python API service.
-- Do not deploy the API against a temporary filesystem for production data.
-- Do not connect the Node.js bot until all required game routes are complete
-  and tested.
+- Do not connect the Node.js bot until the API and asset migration are tested.
 
-## Conversion phases
+## Remaining work before connecting Node.js
 
-1. Standalone API and database layer.
-2. Port economy, inventory, card catalog, pack and deck behavior.
-3. Port battles, trading, marketplace, daily rewards, drops, achievements,
-   friends, leaderboards and admin actions.
-4. Test all API behavior against a fresh development database.
-5. Deploy the Python API as a separate Railway service.
-6. Connect the existing Node.js bot to the API.
-7. Retire the old Python Discord gateway process only after the new flow works.
+- Admin permission and management endpoints.
+- Achievement unlock triggers and secret command behavior.
+- Full end-to-end API tests and reconciliation against every original command.
+- Verify card images and any other local assets.
+- Build the Node.js HTTP client and replace FutBot Discord presentation with
+  Node.js embeds/buttons/menus.
+- Test both services together before switching the live bot.
