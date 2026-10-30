@@ -1537,3 +1537,58 @@ def delete_deck(user_id: int, deck_name: str):
         if cur.rowcount == 0:
             raise GameError("Deck not found.", 404)
     return {"name": deck_name, "deleted": True}
+
+
+
+def get_owned_card_copies(user_id: int, card_id: int):
+    with read_connection() as db:
+        rows = db.execute(
+            """SELECT c.*, i.rowid AS inventory_row_id, i.edition,
+                i.battles_played AS owner_battles_played,
+                i.battles_won AS owner_battles_won,
+                i.rounds_played AS owner_rounds_played,
+                i.rounds_won AS owner_rounds_won,
+                i.trade_count
+            FROM inventories i JOIN cards c ON c.card_id = i.card_id
+            WHERE i.user_id = ? AND i.card_id = ? ORDER BY i.edition""",
+            (user_id, card_id),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_card_weight(search: str):
+    from difflib import get_close_matches
+    query = search.strip()
+    if not query:
+        raise GameError("Enter a card name.")
+    with read_connection() as db:
+        rows = db.execute("SELECT card_id, name, overall, card_type FROM cards").fetchall()
+        if query.isdigit():
+            card = next((row for row in rows if row["card_id"] == int(query)), None)
+        else:
+            matches = [row for row in rows if query.lower() in row["name"].lower()]
+            if matches:
+                card = matches[0]
+            else:
+                names = [row["name"] for row in rows]
+                close = get_close_matches(query, names, n=1, cutoff=0.45)
+                card = next((row for row in rows if close and row["name"] == close[0]), None)
+        if card is None:
+            raise GameError("Card not found or it has no defined pack weight.", 404)
+        if card["card_type"] == "Standard":
+            total = db.execute("SELECT COUNT(*) AS n FROM cards WHERE card_type = 'Standard'").fetchone()["n"]
+            if not total:
+                raise GameError("The card catalog is empty.", 409)
+            overall = card["overall"] or 0
+            if 70 <= overall <= 79: weight = 70
+            elif 80 <= overall <= 85: weight = 20
+            elif 86 <= overall <= 90: weight = 7
+            elif overall > 90: weight = 3
+            else: raise GameError("This card has no defined pack weight.", 404)
+            value = weight / total
+        else:
+            total = db.execute("SELECT COUNT(*) AS n FROM cards WHERE card_type != 'Standard'").fetchone()["n"]
+            if not total:
+                raise GameError("The non-standard card catalog is empty.", 409)
+            value = 3 / total
+    return {"card_id": card["card_id"], "name": card["name"], "weight": value}
