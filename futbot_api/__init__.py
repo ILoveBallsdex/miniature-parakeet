@@ -1,0 +1,1 @@
+"""FutBot API package."""
