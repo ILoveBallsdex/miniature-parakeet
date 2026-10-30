@@ -65,7 +65,7 @@ def get_player(user_id: int):
 
 def get_inventory(user_id: int):
     with read_connection() as db:
-        rows = db.execute("""SELECT c.*, i.edition, i.battles_played AS owner_battles_played,
+        rows = db.execute("""SELECT c.*, i.rowid AS inventory_row_id, i.edition, i.battles_played AS owner_battles_played,
             i.battles_won AS owner_battles_won, i.rounds_played AS owner_rounds_played,
             i.rounds_won AS owner_rounds_won, i.trade_count
             FROM inventories i JOIN cards c ON c.card_id = i.card_id
@@ -1297,3 +1297,92 @@ def leaderboard_entries(stat: str, limit: int = 10, user_ids=None):
             (*params, limit),
         ).fetchall()
     return {"stat": stat, "entries": [{"rank": i + 1, **dict(row)} for i, row in enumerate(rows)]}
+
+
+
+# --------------------------------- Trade up -----------------------------------
+
+
+TRADE_UP_TIERS = {
+    "common": {"rarity": "Common", "reward": "Uncommon"},
+    "uncommon": {"rarity": "Uncommon", "reward": "Rare"},
+    "rare": {"rarity": "Rare Standard", "reward": "Hero/Icon (93 OVR or lower)"},
+}
+
+
+def eligible_trade_up_cards(user_id: int, tier: str):
+    if tier not in TRADE_UP_TIERS:
+        raise GameError("Tier must be common, uncommon, or rare.")
+    if tier == "common":
+        rarity_filter = "c.card_rarity = 'Common'"
+    elif tier == "uncommon":
+        rarity_filter = "c.card_rarity = 'Uncommon'"
+    else:
+        rarity_filter = "c.card_rarity = 'Rare' AND c.card_type = 'Standard'"
+    with read_connection() as db:
+        rows = db.execute(
+            f"""SELECT i.rowid AS inventory_row_id, c.card_id, c.name, c.overall,
+                i.edition, c.card_rarity, c.card_type, i.trade_count
+                FROM inventories i JOIN cards c ON c.card_id = i.card_id
+                WHERE i.user_id = ? AND {rarity_filter}
+                ORDER BY c.overall ASC""",
+            (user_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def execute_trade_up(user_id: int, tier: str, inventory_row_ids: list[int]):
+    if tier not in TRADE_UP_TIERS:
+        raise GameError("Tier must be common, uncommon, or rare.")
+    row_ids = list(dict.fromkeys(int(value) for value in inventory_row_ids))
+    if len(row_ids) != 5:
+        raise GameError("Select exactly five cards to trade up.")
+    with transaction() as db:
+        if tier == "common":
+            rarity_filter = "c.card_rarity = 'Common'"
+        elif tier == "uncommon":
+            rarity_filter = "c.card_rarity = 'Uncommon'"
+        else:
+            rarity_filter = "c.card_rarity = 'Rare' AND c.card_type = 'Standard'"
+        owned = db.execute(
+            f"""SELECT i.rowid, i.card_id FROM inventories i
+                JOIN cards c ON c.card_id = i.card_id
+                WHERE i.user_id = ? AND {rarity_filter}
+                AND i.rowid IN ({','.join('?' for _ in row_ids)})""",
+            (user_id, *row_ids),
+        ).fetchall()
+        if len(owned) != 5:
+            raise GameError("One or more selected cards are no longer eligible or owned.", 409)
+
+        reward = None
+        if tier == "common":
+            reward = db.execute(
+                "SELECT * FROM cards WHERE card_rarity = 'Uncommon' AND card_type != 'Unique' ORDER BY RANDOM() LIMIT 1"
+            ).fetchone()
+        elif tier == "uncommon":
+            categories = [("std_mid", 55), ("std_hi", 20), ("hero", 5), ("icon", 2)]
+            chosen = random.choices([item[0] for item in categories], weights=[item[1] for item in categories], k=1)[0]
+            queries = {
+                "std_mid": "card_type = 'Standard' AND card_rarity = 'Rare' AND overall BETWEEN 86 AND 89",
+                "std_hi": "card_type = 'Standard' AND card_rarity = 'Rare' AND overall >= 90",
+                "hero": "card_type = 'Hero'",
+                "icon": "card_type = 'Icon'",
+            }
+            reward = db.execute(f"SELECT * FROM cards WHERE {queries[chosen]} ORDER BY RANDOM() LIMIT 1").fetchone()
+            if reward is None:
+                reward = db.execute(
+                    "SELECT * FROM cards WHERE card_type = 'Standard' AND card_rarity = 'Rare' AND overall >= 86 ORDER BY RANDOM() LIMIT 1"
+                ).fetchone()
+        else:
+            reward = db.execute(
+                "SELECT * FROM cards WHERE card_type IN ('Hero', 'Icon') AND overall <= 93 ORDER BY RANDOM() LIMIT 1"
+            ).fetchone()
+        if reward is None:
+            raise GameError("No eligible reward cards are available.", 409)
+
+        db.executemany("DELETE FROM inventories WHERE rowid = ?", [(row_id,) for row_id in row_ids])
+        current_copies = int(reward["copies"] or 0)
+        edition = current_copies + 1
+        db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (reward["card_id"],))
+        db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)", (user_id, reward["card_id"], edition))
+    return {"tier": tier, "sacrificed_inventory_row_ids": row_ids, "reward": dict(reward), "edition": edition}
