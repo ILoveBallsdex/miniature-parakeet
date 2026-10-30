@@ -2,6 +2,8 @@
 
 import random
 import sqlite3
+import json
+from datetime import datetime, timedelta
 from .database import read_connection, transaction, row_dict
 
 PACKS = {
@@ -202,3 +204,161 @@ def save_deck(user_id: int, deck_name: str, card_ids: list[int]):
         else:
             db.execute("INSERT INTO decks (user_id, deck_name, cards) VALUES (?, ?, ?)", (user_id, name, ",".join(map(str, card_ids))))
     return {"name": name, "card_ids": card_ids}
+
+
+
+def _weighted_card_rows(db, excluded_ids=()):
+    rows = db.execute("SELECT * FROM cards ORDER BY card_id").fetchall()
+    weighted = []
+    excluded = set(excluded_ids)
+    for card in rows:
+        if card["card_id"] in excluded:
+            continue
+        overall = card["overall"] or 0
+        card_type = card["card_type"] or ""
+        weight = 0
+        if card_type == "Standard":
+            if 70 <= overall <= 79: weight = 70
+            elif 80 <= overall <= 85: weight = 20
+            elif 86 <= overall <= 90: weight = 7
+            elif overall > 90: weight = 3
+        elif card_type == "Hero":
+            weight = 2
+        elif card_type == "Icon":
+            if 80 <= overall <= 89: weight = 2
+            elif overall >= 90: weight = 1
+        elif card_type in ("Euro TOTT", "Copa America TOTT"):
+            weight = 1
+        if weight:
+            weighted.append((card, weight))
+    return weighted
+
+
+def _weighted_choice(weighted):
+    if not weighted:
+        return None
+    return random.choices([item[0] for item in weighted], weights=[item[1] for item in weighted], k=1)[0]
+
+
+def claim_daily(user_id: int):
+    today = datetime.now().date()
+    now = datetime.now()
+    with transaction() as db:
+        player = db.execute("SELECT daily_streak, last_daily_claim FROM players WHERE user_id = ?", (user_id,)).fetchone()
+        if player is None:
+            raise GameError("Player not found. Create the player first.", 404)
+        last_claim = player["last_daily_claim"]
+        streak = int(player["daily_streak"] or 0)
+        if last_claim:
+            try:
+                last_date = datetime.fromisoformat(last_claim).date()
+            except ValueError:
+                last_date = None
+            if last_date == today:
+                next_claim = datetime.combine(today + timedelta(days=1), datetime.min.time())
+                raise GameError(f"Daily reward already claimed. Try again after {next_claim.isoformat()}.", 409)
+            if last_date == today - timedelta(days=1):
+                streak += 1
+            else:
+                streak = 1
+        else:
+            streak = 1
+
+        if streak >= 14:
+            bonus = 300
+            tier = "Legendary"
+        elif streak >= 7:
+            bonus = 200
+            tier = "Diamond"
+        elif streak >= 4:
+            bonus = 150
+            tier = "Silver"
+        else:
+            bonus = 100
+            tier = "Bronze"
+
+        weighted = _weighted_card_rows(db)
+        first = _weighted_choice(weighted)
+        if first is None:
+            raise GameError("The card catalog has no cards eligible for daily rewards.", 409)
+        second = _weighted_choice(_weighted_card_rows(db, [first["card_id"]]))
+        if second is None:
+            raise GameError("At least two eligible cards are required for daily rewards.", 409)
+
+        db.execute(
+            "UPDATE players SET daily_streak = ?, last_daily_claim = ?, coins = COALESCE(coins, 0) + ?, cards_dropped = COALESCE(cards_dropped, 0) + 1 WHERE user_id = ?",
+            (streak, now.isoformat(), bonus, user_id),
+        )
+        milestone_pack = streak in (7, 14)
+        if milestone_pack:
+            db.execute("INSERT INTO packs (user_id) VALUES (?) ON CONFLICT(user_id) DO NOTHING", (user_id,))
+            db.execute("UPDATE packs SET rare_player_pack = rare_player_pack + 1 WHERE user_id = ?", (user_id,))
+        db.execute(
+            "INSERT INTO pending_daily_rewards (user_id, card_ids, created_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET card_ids = excluded.card_ids, created_at = excluded.created_at",
+            (user_id, json.dumps([first["card_id"], second["card_id"]]), now.isoformat()),
+        )
+        balance = db.execute("SELECT coins FROM players WHERE user_id = ?", (user_id,)).fetchone()["coins"]
+
+    return {
+        "streak": streak,
+        "tier": tier,
+        "coins_earned": bonus,
+        "balance": balance,
+        "milestone_pack_awarded": milestone_pack,
+        "choices": [dict(first), dict(second)],
+        "expires_in_seconds": 120,
+    }
+
+
+def collect_daily(user_id: int, card_id: int):
+    with transaction() as db:
+        pending = db.execute("SELECT card_ids FROM pending_daily_rewards WHERE user_id = ?", (user_id,)).fetchone()
+        if pending is None:
+            raise GameError("There is no active daily reward to collect.", 409)
+        choices = json.loads(pending["card_ids"])
+        if card_id not in choices:
+            raise GameError("That card was not one of your daily reward choices.", 403)
+        if db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (user_id, card_id)).fetchone():
+            raise GameError("You already own this card.", 409)
+        card = db.execute("SELECT * FROM cards WHERE card_id = ?", (card_id,)).fetchone()
+        if card is None:
+            raise GameError("Card not found.", 404)
+        copies = int(card["copies"] or 0)
+        db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)", (user_id, card_id, copies + 1))
+        db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card_id,))
+        db.execute("DELETE FROM pending_daily_rewards WHERE user_id = ?", (user_id,))
+    return {"card": dict(card), "edition": copies + 1}
+
+
+def claim_starter_pack(user_id: int):
+    with transaction() as db:
+        player = db.execute("SELECT has_claimed_starter_pack FROM players WHERE user_id = ?", (user_id,)).fetchone()
+        if player is None:
+            raise GameError("Player not found. Create the player first.", 404)
+        if player["has_claimed_starter_pack"]:
+            raise GameError("You have already claimed your starter pack.", 409)
+
+        selections = []
+        groups = [
+            ("overall BETWEEN 70 AND 79", 6),
+            ("overall BETWEEN 80 AND 85", 3),
+            ("overall > 85 AND card_type = 'Standard'", 1),
+        ]
+        excluded = []
+        for condition, amount in groups:
+            for _ in range(amount):
+                row = db.execute(
+                    f"SELECT * FROM cards WHERE {condition} AND card_id NOT IN (SELECT card_id FROM inventories WHERE user_id = ?) AND card_id NOT IN ({','.join('?' for _ in excluded) if excluded else 'NULL'}) ORDER BY RANDOM() LIMIT 1",
+                    (user_id, *excluded),
+                ).fetchone()
+                if row is None:
+                    raise GameError("There are not enough eligible unowned cards for the starter pack.", 409)
+                selections.append(row)
+                excluded.append(row["card_id"])
+
+        for card in selections:
+            copies = int(card["copies"] or 0)
+            db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)", (user_id, card["card_id"], copies + 1))
+            db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card["card_id"],))
+        db.execute("UPDATE players SET has_claimed_starter_pack = 1 WHERE user_id = ?", (user_id,))
+    return {"cards": [dict(card) for card in selections], "count": len(selections)}
