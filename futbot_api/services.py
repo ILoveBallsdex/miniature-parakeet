@@ -978,3 +978,167 @@ def collect_card_drop(drop_id: str, user_id: int, username: str):
     if expired:
         raise GameError("This drop has expired.", 410)
     return {"drop_id": drop_id, "collected_by": user_id, "card": dict(card)}
+
+
+
+# ------------------------------- Transfer market -----------------------------
+
+
+def expire_market_listings():
+    from datetime import datetime
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    with transaction() as db:
+        rows = db.execute(
+            "SELECT listing_id, seller_id, card_id, edition, trade_count FROM market_listings WHERE status = 'active' AND expires_at <= ?",
+            (now,),
+        ).fetchall()
+        for row in rows:
+            db.execute(
+                "INSERT INTO inventories (user_id, card_id, edition, trade_count) VALUES (?, ?, ?, ?)",
+                (row["seller_id"], row["card_id"], row["edition"], row["trade_count"]),
+            )
+            db.execute(
+                "UPDATE market_listings SET status = 'expired', resolved_at = ? WHERE listing_id = ?",
+                (now, row["listing_id"]),
+            )
+    return {"expired": len(rows)}
+
+
+def create_market_listing(user_id: int, card_id: int, edition: int, price: int, duration_hours: int):
+    from datetime import datetime, timedelta
+    if duration_hours not in (1, 3, 6, 12, 24, 48):
+        raise GameError("Listing duration must be 1, 3, 6, 12, 24, or 48 hours.")
+    if price <= 0:
+        raise GameError("Listing price must be positive.")
+    with transaction() as db:
+        card = db.execute("SELECT * FROM cards WHERE card_id = ?", (card_id,)).fetchone()
+        if card is None:
+            raise GameError("Card not found.", 404)
+        minimum = card_value(card["overall"] or 0)
+        if price < minimum:
+            raise GameError(f"Minimum listing price is {minimum} coins.")
+        inventory = db.execute(
+            "SELECT rowid, trade_count FROM inventories WHERE user_id = ? AND card_id = ? AND edition = ? ORDER BY rowid LIMIT 1",
+            (user_id, card_id, edition),
+        ).fetchone()
+        if inventory is None:
+            raise GameError("You do not own that card edition.", 409)
+        if db.execute(
+            "SELECT 1 FROM market_listings WHERE seller_id = ? AND card_id = ? AND edition = ? AND status = 'active'",
+            (user_id, card_id, edition),
+        ).fetchone():
+            raise GameError("That card edition is already listed.", 409)
+        now = datetime.utcnow()
+        expires = now + timedelta(hours=duration_hours)
+        db.execute("DELETE FROM inventories WHERE rowid = ?", (inventory["rowid"],))
+        cur = db.execute(
+            """INSERT INTO market_listings
+            (seller_id, card_id, edition, trade_count, price, listed_at, expires_at, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active')""",
+            (user_id, card_id, edition, inventory["trade_count"] or 0, price,
+             now.strftime("%Y-%m-%d %H:%M:%S"), expires.strftime("%Y-%m-%d %H:%M:%S")),
+        )
+        listing_id = cur.lastrowid
+    return {"listing_id": listing_id, "seller_id": user_id, "card": dict(card), "edition": edition, "price": price, "expires_at": expires.strftime("%Y-%m-%d %H:%M:%S")}
+
+
+def browse_market(search: str = "", page: int = 0, page_size: int = 5):
+    expire_market_listings()
+    page = max(0, int(page))
+    page_size = max(1, min(int(page_size), 25))
+    with read_connection() as db:
+        where = "ml.status = 'active'"
+        params = []
+        if search:
+            where += " AND c.name LIKE ?"
+            params.append(f"%{search[:100]}%")
+        total = db.execute(
+            f"SELECT COUNT(*) AS n FROM market_listings ml JOIN cards c ON c.card_id = ml.card_id WHERE {where}",
+            params,
+        ).fetchone()["n"]
+        rows = db.execute(
+            f"""SELECT ml.listing_id, ml.seller_id, ml.card_id, ml.edition,
+                ml.price, ml.expires_at, c.name, c.overall, c.card_rarity,
+                p.name AS seller_name
+                FROM market_listings ml
+                JOIN cards c ON c.card_id = ml.card_id
+                LEFT JOIN players p ON p.user_id = ml.seller_id
+                WHERE {where}
+                ORDER BY ml.listed_at DESC LIMIT ? OFFSET ?""",
+            (*params, page_size, page * page_size),
+        ).fetchall()
+    return {"listings": [dict(row) for row in rows], "total": total, "page": page, "page_size": page_size}
+
+
+def buy_market_listing(listing_id: int, buyer_id: int):
+    from datetime import datetime
+    expired = False
+    with transaction() as db:
+        listing = db.execute("SELECT * FROM market_listings WHERE listing_id = ?", (listing_id,)).fetchone()
+        if listing is None or listing["status"] != "active":
+            raise GameError("This listing is no longer available.", 404)
+        now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        if listing["expires_at"] <= now:
+            db.execute(
+                "INSERT INTO inventories (user_id, card_id, edition, trade_count) VALUES (?, ?, ?, ?)",
+                (listing["seller_id"], listing["card_id"], listing["edition"], listing["trade_count"]),
+            )
+            db.execute("UPDATE market_listings SET status = 'expired', resolved_at = ? WHERE listing_id = ?", (now, listing_id))
+            expired = True
+        else:
+            if buyer_id == listing["seller_id"]:
+                raise GameError("You cannot buy your own listing.", 403)
+            buyer = db.execute("SELECT coins FROM players WHERE user_id = ?", (buyer_id,)).fetchone()
+            if buyer is None:
+                raise GameError("Buyer player not found.", 404)
+            if (buyer["coins"] or 0) < listing["price"]:
+                raise GameError("You do not have enough coins.", 409)
+            card = db.execute("SELECT * FROM cards WHERE card_id = ?", (listing["card_id"],)).fetchone()
+            db.execute("UPDATE players SET coins = coins - ? WHERE user_id = ?", (listing["price"], buyer_id))
+            db.execute("UPDATE players SET coins = COALESCE(coins, 0) + ? WHERE user_id = ?", (listing["price"], listing["seller_id"]))
+            db.execute(
+                "INSERT INTO inventories (user_id, card_id, edition, trade_count) VALUES (?, ?, ?, ?)",
+                (buyer_id, listing["card_id"], listing["edition"], (listing["trade_count"] or 0) + 1),
+            )
+            db.execute(
+                "UPDATE market_listings SET status = 'sold', resolved_at = ?, buyer_id = ? WHERE listing_id = ?",
+                (now, buyer_id, listing_id),
+            )
+    if expired:
+        raise GameError("This listing has expired and the card was returned to its seller.", 410)
+    return {"listing_id": listing_id, "buyer_id": buyer_id, "seller_id": listing["seller_id"], "card": dict(card), "edition": listing["edition"], "price": listing["price"]}
+
+
+def cancel_market_listing(listing_id: int, seller_id: int):
+    from datetime import datetime
+    with transaction() as db:
+        listing = db.execute(
+            "SELECT * FROM market_listings WHERE listing_id = ? AND seller_id = ? AND status = 'active'",
+            (listing_id, seller_id),
+        ).fetchone()
+        if listing is None:
+            raise GameError("Listing not found, already sold, or it is not yours.", 404)
+        now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        db.execute(
+            "INSERT INTO inventories (user_id, card_id, edition, trade_count) VALUES (?, ?, ?, ?)",
+            (seller_id, listing["card_id"], listing["edition"], listing["trade_count"]),
+        )
+        db.execute(
+            "UPDATE market_listings SET status = 'cancelled', resolved_at = ? WHERE listing_id = ?",
+            (now, listing_id),
+        )
+    return {"listing_id": listing_id, "status": "cancelled", "card_id": listing["card_id"], "edition": listing["edition"]}
+
+
+def get_player_listings(user_id: int):
+    expire_market_listings()
+    with read_connection() as db:
+        rows = db.execute(
+            """SELECT ml.listing_id, ml.card_id, ml.edition, ml.price, ml.expires_at,
+                c.name, c.overall, c.card_rarity
+                FROM market_listings ml JOIN cards c ON c.card_id = ml.card_id
+                WHERE ml.seller_id = ? AND ml.status = 'active'
+                ORDER BY ml.listed_at DESC""",
+            (user_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
