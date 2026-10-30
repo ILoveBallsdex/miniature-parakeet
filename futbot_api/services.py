@@ -923,6 +923,8 @@ def create_card_drop(owner_id: int | None = None):
         drop_id = uuid.uuid4().hex
         expires = now + timedelta(seconds=120)
         db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card["card_id"],))
+        if owner_id is not None:
+            db.execute("UPDATE players SET cards_dropped = COALESCE(cards_dropped, 0) + 1 WHERE user_id = ?", (owner_id,))
         db.execute(
             "INSERT INTO drop_sessions (drop_id, card_id, owner_id, created_at, expires_at, status) VALUES (?, ?, ?, ?, ?, 'active')",
             (drop_id, card["card_id"], owner_id, now.isoformat(), expires.isoformat()),
@@ -953,21 +955,36 @@ def collect_card_drop(drop_id: str, user_id: int, username: str):
         expires = datetime.fromisoformat(drop["expires_at"])
         if now >= expires:
             db.execute("UPDATE drop_sessions SET status = 'expired' WHERE drop_id = ?", (drop_id,))
-            raise GameError("This drop has expired.", 410)
+            expired = True
+        else:
+            expired = False
+        if expired:
+            # Return from the transaction normally so the expired status is committed.
+            pass
+        if expired:
+            result = None
+        else:
+            result = True
+        if expired:
+            # No inventory or player changes are made for expired drops.
+            pass
         created = datetime.fromisoformat(drop["created_at"])
-        if drop["owner_id"] is not None and user_id != drop["owner_id"] and (now - created).total_seconds() < 10:
+        if not expired and drop["owner_id"] is not None and user_id != drop["owner_id"] and (now - created).total_seconds() < 10:
             raise GameError("The drop is still reserved for its owner.", 403)
-        db.execute(
-            "INSERT INTO players (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = excluded.name",
-            (user_id, username.strip()[:100] or str(user_id)),
-        )
-        if db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (user_id, drop["card_id"])).fetchone():
+        if not expired:
+            db.execute(
+                "INSERT INTO players (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = excluded.name",
+                (user_id, username.strip()[:100] or str(user_id)),
+            )
+        if not expired and db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (user_id, drop["card_id"])).fetchone():
             raise GameError("You already own this card.", 409)
-        card = db.execute("SELECT * FROM cards WHERE card_id = ?", (drop["card_id"],)).fetchone()
-        db.execute(
-            "INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, COALESCE((SELECT copies FROM cards WHERE card_id = ?), 1))",
-            (user_id, drop["card_id"], drop["card_id"]),
-        )
-        db.execute("UPDATE players SET cards_dropped = COALESCE(cards_dropped, 0) + 1 WHERE user_id = ?", (user_id,))
-        db.execute("UPDATE drop_sessions SET status = 'collected' WHERE drop_id = ?", (drop_id,))
+        card = db.execute("SELECT * FROM cards WHERE card_id = ?", (drop["card_id"],)).fetchone() if not expired else None
+        if not expired:
+            db.execute(
+                "INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, COALESCE((SELECT copies FROM cards WHERE card_id = ?), 1))",
+                (user_id, drop["card_id"], drop["card_id"]),
+            )
+            db.execute("UPDATE drop_sessions SET status = 'collected' WHERE drop_id = ?", (drop_id,))
+    if expired:
+        raise GameError("This drop has expired.", 410)
     return {"drop_id": drop_id, "collected_by": user_id, "card": dict(card)}
