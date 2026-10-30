@@ -168,46 +168,48 @@ python -m unittest discover -s tests -v
 
 GitHub Actions also runs these tests on pushes to this branch.
 
-## Import the new database
+## Add your custom cards
 
-The old `cards_game.db` is not stored in GitHub. Create a separate API database
-and copy the card catalog from your local database:
+The API starts with an empty card catalog. Add your own card images and define
+the cards in JSON; no old database or old card files are imported.
 
-```bash
-python scripts/import_card_catalog.py --source ./cards_game.db --target ./futbot_api.db
-```
-
-The import script:
-- Copies card identity, stats, rarity, type, league, nation and image paths.
-- Copies achievement definitions.
-- Resets destination player accounts, inventories, coins, packs, decks, trades,
-  friendships, market listings and battle history.
-- Resets card copy counts, wishlist counts and global battle counters.
-- Never modifies the source database and refuses source = target.
-
-Keep your original database as a backup.
-
-## Card images
-
-The repository does not contain the card image files. The database only stores
-image paths. Check that the files are present on your computer:
+1. Put each card image inside the folder configured by `FUTBOT_ASSET_DIR`.
+   For local testing, this is normally the project's `assets` folder.
+2. Copy `examples/custom_cards.example.json` to a file such as
+   `my_cards.json` and replace the example details with your cards.
+3. Run the importer from the project folder with the virtual environment active:
 
 ```bash
-python scripts/verify_card_assets.py --database ./cards_game.db --asset-root .
+python scripts/import_custom_cards.py --file ./my_cards.json
 ```
 
-After importing the card catalog, copy and normalize all image files into the
-new API asset folder:
+The importer uses `FUTBOT_DB_PATH` and `FUTBOT_ASSET_DIR` from `.env`.
+You can also pass `--database` and `--asset-root` explicitly.
+
+Each card needs these fields:
+
+| Field | Meaning |
+|---|---|
+| `card_id` | Unique numeric ID for the card |
+| `name` | Player name |
+| `attack`, `defense`, `speed` | Card stats |
+| `overall` | Overall rating (0–99) |
+| `image_path` | Image path relative to the asset folder |
+| `card_rarity` | Rarity label |
+| `card_type` | Type, such as `Standard`, `Icon` or `Hero` |
+
+Optional fields: `player_id`, `height`, `club`, `position`, `league`,
+and `nation`. The importer checks image paths, rejects duplicate IDs in the
+same file, and will not overwrite an existing card unless you add `--update`.
+
+Example image path: `cards/example_player.png` means the file should be at
+`assets/cards/example_player.png` when `FUTBOT_ASSET_DIR=./assets`.
+
+After importing, restart the API if needed and check:
 
 ```bash
-python scripts/migrate_card_assets.py --source-db ./cards_game.db --source-root . --target-db ./futbot_api.db --target-assets ./assets
+curl -H "X-API-Key: YOUR_API_KEY" http://127.0.0.1:8000/api/v1/cards
 ```
-
-This reads the original DB, copies the images, and changes only the new API
-database's `image_path` values to safe relative filenames. It does not modify
-the original DB. Before deployment, place the copied files in the Python
-service's persistent asset folder and set `FUTBOT_ASSET_DIR` to that folder.
-The API serves only files inside this configured directory.
 
 ## Railway deployment (later)
 
