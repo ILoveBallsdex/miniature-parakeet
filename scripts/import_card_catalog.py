@@ -48,9 +48,18 @@ def main():
         if not rows:
             raise SystemExit("The source cards table is empty; nothing was imported.")
 
-        source_columns = [item[1] for item in source.execute("PRAGMA table_info(cards)")]
+        source_columns = {item[1] for item in source.execute("PRAGMA table_info(cards)")}
         target_columns = {item[1] for item in target.execute("PRAGMA table_info(cards)")}
-        columns = [column for column in source_columns if column in target_columns]
+        # Only immutable card catalog fields are imported. Ownership/copy counts,
+        # wishlists, and global battle statistics start fresh for the new player base.
+        catalog_columns = [
+            "card_id", "player_id", "name", "attack", "defense", "speed",
+            "height", "club", "position", "overall", "image_path",
+            "card_rarity", "card_type", "league", "nation",
+        ]
+        columns = [column for column in catalog_columns if column in source_columns and column in target_columns]
+        if "card_id" not in columns or "name" not in columns:
+            raise SystemExit("The source cards table is missing required catalog columns.")
         quoted = ", ".join('"' + column.replace('"', '""') + '"' for column in columns)
         placeholders = ", ".join("?" for _ in columns)
         values = [[row[column] for column in columns] for row in rows]
@@ -79,7 +88,7 @@ def main():
         target.commit()
         print(f"Imported {len(values)} card catalog entries into {target_path}")
         print(f"Imported {achievement_count} achievement definitions.")
-        print("No player, inventory, currency, pack, deck, trade, earned-achievement, or match data was copied.")
+        print("Player data and all per-card copy, wishlist, and battle counters were reset.")
     except Exception:
         target.rollback()
         raise
