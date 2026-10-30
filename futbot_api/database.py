@@ -106,6 +106,12 @@ def init_database() -> None:
             created_at TEXT NOT NULL,
             FOREIGN KEY(user_id) REFERENCES players(user_id)
         )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS battles (
+            battle_id TEXT PRIMARY KEY, player1_id INTEGER NOT NULL,
+            player2_id INTEGER NOT NULL, status TEXT NOT NULL,
+            state_json TEXT NOT NULL, created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )""")
         db.execute("""CREATE TABLE IF NOT EXISTS market_listings (
             listing_id INTEGER PRIMARY KEY AUTOINCREMENT, seller_id INTEGER,
             card_id INTEGER, edition INTEGER DEFAULT 1, trade_count INTEGER DEFAULT 0,
