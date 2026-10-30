@@ -689,3 +689,197 @@ def surrender_battle(battle_id: str, user_id: int):
         db.execute("UPDATE battles SET status = 'completed', state_json = ?, updated_at = ? WHERE battle_id = ?", (json.dumps(state), datetime.utcnow().isoformat(), battle_id))
         row = _battle_row(db, battle_id)
     return _battle_payload(row)
+
+
+
+# --------------------------- Trading and exchange ---------------------------
+
+
+def create_trade_offer(sender_id: int, recipient_id: int, sender_card_id: int, recipient_card_id: int):
+    import uuid
+    from datetime import datetime
+    if sender_id == recipient_id:
+        raise GameError("You cannot trade with yourself.")
+    with transaction() as db:
+        for user_id in (sender_id, recipient_id):
+            if not db.execute("SELECT 1 FROM players WHERE user_id = ?", (user_id,)).fetchone():
+                raise GameError(f"Player {user_id} does not exist.", 404)
+        for user_id, card_id in ((sender_id, sender_card_id), (recipient_id, recipient_card_id)):
+            if not db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (user_id, card_id)).fetchone():
+                raise GameError(f"Player {user_id} does not own card {card_id}.", 409)
+        if db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (recipient_id, sender_card_id)).fetchone():
+            raise GameError("The recipient already owns your offered card.", 409)
+        if db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (sender_id, recipient_card_id)).fetchone():
+            raise GameError("You already own the recipient's offered card.", 409)
+        trade_id = uuid.uuid4().hex
+        now = datetime.utcnow().isoformat()
+        db.execute(
+            "INSERT INTO trade_offers (trade_id, sender_id, recipient_id, sender_card_id, recipient_card_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
+            (trade_id, sender_id, recipient_id, sender_card_id, recipient_card_id, now, now),
+        )
+        row = db.execute("SELECT * FROM trade_offers WHERE trade_id = ?", (trade_id,)).fetchone()
+    return dict(row)
+
+
+def resolve_trade_offer(trade_id: str, user_id: int, accept: bool):
+    from datetime import datetime
+    with transaction() as db:
+        offer = db.execute("SELECT * FROM trade_offers WHERE trade_id = ?", (trade_id,)).fetchone()
+        if offer is None:
+            raise GameError("Trade offer not found.", 404)
+        if user_id != offer["recipient_id"] and not (not accept and user_id == offer["sender_id"]):
+            raise GameError("You cannot resolve this trade offer.", 403)
+        if offer["status"] != "pending":
+            raise GameError("This trade offer is no longer pending.", 409)
+        now = datetime.utcnow().isoformat()
+        if not accept:
+            db.execute("UPDATE trade_offers SET status = 'declined', updated_at = ? WHERE trade_id = ?", (now, trade_id))
+        else:
+            pairs = (
+                (offer["sender_id"], offer["sender_card_id"], offer["recipient_id"]),
+                (offer["recipient_id"], offer["recipient_card_id"], offer["sender_id"]),
+            )
+            for owner_id, card_id, new_owner in pairs:
+                if not db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (owner_id, card_id)).fetchone():
+                    raise GameError("A player no longer owns the offered card.", 409)
+                if db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (new_owner, card_id)).fetchone():
+                    raise GameError("A player already owns the card they would receive.", 409)
+            db.execute("UPDATE inventories SET user_id = ?, trade_count = COALESCE(trade_count, 0) + 1 WHERE user_id = ? AND card_id = ?", (offer["recipient_id"], offer["sender_id"], offer["sender_card_id"]))
+            db.execute("UPDATE inventories SET user_id = ?, trade_count = COALESCE(trade_count, 0) + 1 WHERE user_id = ? AND card_id = ?", (offer["sender_id"], offer["recipient_id"], offer["recipient_card_id"]))
+            db.execute("UPDATE trade_offers SET status = 'accepted', updated_at = ? WHERE trade_id = ?", (now, trade_id))
+        result = db.execute("SELECT * FROM trade_offers WHERE trade_id = ?", (trade_id,)).fetchone()
+    return dict(result)
+
+
+def create_exchange(player1_id: int, player2_id: int):
+    import uuid
+    from datetime import datetime
+    if player1_id == player2_id:
+        raise GameError("You cannot exchange with yourself.")
+    with transaction() as db:
+        for user_id in (player1_id, player2_id):
+            if not db.execute("SELECT 1 FROM players WHERE user_id = ?", (user_id,)).fetchone():
+                raise GameError(f"Player {user_id} does not exist.", 404)
+        session_id = uuid.uuid4().hex
+        now = datetime.utcnow().isoformat()
+        db.execute(
+            """INSERT INTO exchange_sessions
+            (session_id, player1_id, player2_id, p1_cards, p2_cards, status, created_at, updated_at)
+            VALUES (?, ?, ?, '[]', '[]', 'open', ?, ?)""",
+            (session_id, player1_id, player2_id, now, now),
+        )
+        row = db.execute("SELECT * FROM exchange_sessions WHERE session_id = ?", (session_id,)).fetchone()
+    return dict(row)
+
+
+def _exchange_row(db, session_id):
+    row = db.execute("SELECT * FROM exchange_sessions WHERE session_id = ?", (session_id,)).fetchone()
+    if row is None:
+        raise GameError("Exchange session not found.", 404)
+    return row
+
+
+def update_exchange_offer(session_id: str, user_id: int, card_ids: list[int], coins: int):
+    from datetime import datetime
+    card_ids = list(dict.fromkeys(int(card_id) for card_id in card_ids))
+    if len(card_ids) > 25:
+        raise GameError("You can offer at most 25 cards.")
+    if coins < 0:
+        raise GameError("Coin offer cannot be negative.")
+    with transaction() as db:
+        row = _exchange_row(db, session_id)
+        if row["status"] != "open":
+            raise GameError("This exchange is no longer open.", 409)
+        if user_id not in (row["player1_id"], row["player2_id"]):
+            raise GameError("You are not part of this exchange.", 403)
+        balance = db.execute("SELECT coins FROM players WHERE user_id = ?", (user_id,)).fetchone()["coins"] or 0
+        if coins > balance:
+            raise GameError("Your coin offer exceeds your current balance.", 409)
+        if card_ids:
+            owned = db.execute(
+                f"SELECT COUNT(DISTINCT card_id) AS n FROM inventories WHERE user_id = ? AND card_id IN ({','.join('?' for _ in card_ids)})",
+                (user_id, *card_ids),
+            ).fetchone()["n"]
+            if owned != len(card_ids):
+                raise GameError("You can only offer cards you currently own.", 409)
+        key_cards = "p1_cards" if user_id == row["player1_id"] else "p2_cards"
+        key_coins = "p1_coins" if user_id == row["player1_id"] else "p2_coins"
+        db.execute(
+            f"UPDATE exchange_sessions SET {key_cards} = ?, {key_coins} = ?, p1_locked = 0, p2_locked = 0, p1_confirmed = 0, p2_confirmed = 0, updated_at = ? WHERE session_id = ?",
+            (json.dumps(card_ids), coins, datetime.utcnow().isoformat(), session_id),
+        )
+        row = _exchange_row(db, session_id)
+    return dict(row)
+
+
+def lock_exchange(session_id: str, user_id: int):
+    from datetime import datetime
+    with transaction() as db:
+        row = _exchange_row(db, session_id)
+        if row["status"] != "open":
+            raise GameError("This exchange is no longer open.", 409)
+        if user_id == row["player1_id"]:
+            key = "p1_locked"
+        elif user_id == row["player2_id"]:
+            key = "p2_locked"
+        else:
+            raise GameError("You are not part of this exchange.", 403)
+        db.execute(f"UPDATE exchange_sessions SET {key} = 1, updated_at = ? WHERE session_id = ?", (datetime.utcnow().isoformat(), session_id))
+        row = _exchange_row(db, session_id)
+    return dict(row)
+
+
+def confirm_exchange(session_id: str, user_id: int):
+    from datetime import datetime
+    with transaction() as db:
+        row = _exchange_row(db, session_id)
+        if row["status"] != "open":
+            raise GameError("This exchange is no longer open.", 409)
+        if not row["p1_locked"] or not row["p2_locked"]:
+            raise GameError("Both players must lock their offers before confirming.", 409)
+        if user_id == row["player1_id"]:
+            key = "p1_confirmed"
+        elif user_id == row["player2_id"]:
+            key = "p2_confirmed"
+        else:
+            raise GameError("You are not part of this exchange.", 403)
+        db.execute(f"UPDATE exchange_sessions SET {key} = 1, updated_at = ? WHERE session_id = ?", (datetime.utcnow().isoformat(), session_id))
+        row = _exchange_row(db, session_id)
+        if row["p1_confirmed"] and row["p2_confirmed"]:
+            p1_cards, p2_cards = json.loads(row["p1_cards"]), json.loads(row["p2_cards"])
+            p1_id, p2_id = row["player1_id"], row["player2_id"]
+            p1_coins, p2_coins = row["p1_coins"], row["p2_coins"]
+            for owner_id, card_ids, other_id in ((p1_id, p1_cards, p2_id), (p2_id, p2_cards, p1_id)):
+                for card_id in card_ids:
+                    if not db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (owner_id, card_id)).fetchone():
+                        raise GameError("An offered card is no longer owned by its player.", 409)
+                    if db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (other_id, card_id)).fetchone():
+                        raise GameError("A player already owns a card they would receive.", 409)
+            balances = {
+                p1_id: db.execute("SELECT coins FROM players WHERE user_id = ?", (p1_id,)).fetchone()["coins"] or 0,
+                p2_id: db.execute("SELECT coins FROM players WHERE user_id = ?", (p2_id,)).fetchone()["coins"] or 0,
+            }
+            if p1_coins > balances[p1_id] or p2_coins > balances[p2_id]:
+                raise GameError("An offer exceeds a player's current coin balance.", 409)
+            for card_id in p1_cards:
+                db.execute("UPDATE inventories SET user_id = ?, trade_count = COALESCE(trade_count, 0) + 1 WHERE user_id = ? AND card_id = ?", (p2_id, p1_id, card_id))
+            for card_id in p2_cards:
+                db.execute("UPDATE inventories SET user_id = ?, trade_count = COALESCE(trade_count, 0) + 1 WHERE user_id = ? AND card_id = ?", (p1_id, p2_id, card_id))
+            db.execute("UPDATE players SET coins = coins - ? + ? WHERE user_id = ?", (p1_coins, p2_coins, p1_id))
+            db.execute("UPDATE players SET coins = coins - ? + ? WHERE user_id = ?", (p2_coins, p1_coins, p2_id))
+            db.execute("UPDATE exchange_sessions SET status = 'completed', updated_at = ? WHERE session_id = ?", (datetime.utcnow().isoformat(), session_id))
+        row = _exchange_row(db, session_id)
+    return dict(row)
+
+
+def cancel_exchange(session_id: str, user_id: int):
+    from datetime import datetime
+    with transaction() as db:
+        row = _exchange_row(db, session_id)
+        if user_id not in (row["player1_id"], row["player2_id"]):
+            raise GameError("You are not part of this exchange.", 403)
+        if row["status"] != "open":
+            raise GameError("This exchange is no longer open.", 409)
+        db.execute("UPDATE exchange_sessions SET status = 'cancelled', updated_at = ? WHERE session_id = ?", (datetime.utcnow().isoformat(), session_id))
+        row = _exchange_row(db, session_id)
+    return dict(row)
