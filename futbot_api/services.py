@@ -347,8 +347,9 @@ def claim_starter_pack(user_id: int):
         excluded = []
         for condition, amount in groups:
             for _ in range(amount):
+                excluded_sql = f" AND card_id NOT IN ({','.join('?' for _ in excluded)})" if excluded else ""
                 row = db.execute(
-                    f"SELECT * FROM cards WHERE {condition} AND card_id NOT IN (SELECT card_id FROM inventories WHERE user_id = ?) AND card_id NOT IN ({','.join('?' for _ in excluded) if excluded else 'NULL'}) ORDER BY RANDOM() LIMIT 1",
+                    f"SELECT * FROM cards WHERE {condition} AND card_id NOT IN (SELECT card_id FROM inventories WHERE user_id = ?){excluded_sql} ORDER BY RANDOM() LIMIT 1",
                     (user_id, *excluded),
                 ).fetchone()
                 if row is None:
