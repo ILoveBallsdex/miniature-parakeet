@@ -3,6 +3,9 @@
 import os
 import tempfile
 import unittest
+from PIL import Image
+
+from futbot_api.images import generate_minted_card
 
 from futbot_api.database import init_database, transaction
 from futbot_api import services
@@ -133,6 +136,12 @@ class FutBotServiceTests(unittest.TestCase):
         result = services.choose_battle_card(battle_id, 456, 12)
         self.assertEqual(result["state"]["phase"], "RESULT")
         self.assertEqual(result["state"]["p1_wins"], 1)
+
+    def test_minted_card_image_generation(self):
+        image_path = os.path.join(self.temp_dir.name, "card.png")
+        Image.new("RGBA", (500, 700), (20, 120, 60, 255)).save(image_path)
+        rendered = generate_minted_card(image_path, None, "Test User", "#1/5")
+        self.assertTrue(rendered.startswith(b"\\x89PNG\\r\\n\\x1a\\n"))
 
     def test_market_escrow_and_purchase(self):
         self.add_owned_card(123, 1)
