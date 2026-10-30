@@ -552,9 +552,11 @@ async def admin_create_catalog_card(request):
     except (KeyError, TypeError, ValueError):
         raise services.GameError("admin_id and card_id are required integers.")
     require_admin(admin_id)
+    payload.pop("image_path", None)
     image_path = _store_admin_card_image(payload, card_id)
-    if image_path:
-        payload["image_path"] = image_path
+    if not image_path:
+        raise services.GameError("Attach a card image to create this card.")
+    payload["image_path"] = image_path
     return success(services.create_catalog_card(payload), 201)
 
 
@@ -566,6 +568,7 @@ async def admin_replace_catalog_card(request):
     except (KeyError, TypeError, ValueError):
         raise services.GameError("admin_id and a valid card ID are required.")
     require_admin(admin_id)
+    payload.pop("image_path", None)
     image_path = _store_admin_card_image(payload, card_id)
     if image_path:
         payload["image_path"] = image_path
@@ -602,9 +605,11 @@ async def admin_import_catalog_cards(request):
             card_id = int(item["card_id"])
         except (KeyError, TypeError, ValueError):
             raise services.GameError("Every card needs an integer card_id.")
+        item.pop("image_path", None)
         image_path = _store_admin_card_image(item, card_id)
-        if image_path:
-            item["image_path"] = image_path
+        if not image_path:
+            raise services.GameError(f"Card {card_id}: include an image_base64 value.")
+        item["image_path"] = image_path
         item.pop("image_base64", None)
         try:
             if item.pop("replace_existing", False):
