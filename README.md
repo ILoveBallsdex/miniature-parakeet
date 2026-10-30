@@ -1,6 +1,8 @@
 # ⚽ FutBot - Football Card Battle Bot
 
-**FutBot** is a feature-rich Discord bot that brings the excitement of football card collecting and battling to your server. Collect cards, build your dream team, trade with friends, and compete in tactical 5-round battles.
+**FutBot** is a football card collecting and battle game. Collect cards, build your dream team, trade with friends, and compete in tactical 5-round battles.
+
+> **API conversion branch:** This branch is being converted into the Python game backend for the Node.js Discord bot. It does not connect to Discord. Run `python api_server.py` to start the API. The original standalone Discord bot remains on the `main` branch. See [API_CONVERSION.md](API_CONVERSION.md) for setup, routes and migration steps.
 
 ---
 
@@ -44,7 +46,9 @@ This project is licensed under the **PolyForm Noncommercial License 1.0.0**.
 
 ---
 
-## 🛠️ Installation & Setup
+## 🛠️ Legacy Standalone Bot Setup
+
+The instructions below describe the original Discord bot on the `main` branch. They are not the startup instructions for the API conversion branch.
 
 ### Prerequisites
 * Python 3.8 or higher
