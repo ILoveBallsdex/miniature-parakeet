@@ -2,7 +2,7 @@
 
 import random
 import sqlite3
-from .database import connect, transaction, row_dict
+from .database import read_connection, transaction, row_dict
 
 PACKS = {
     1: {"name": "rare_player_pack", "display_name": "Rare Player Pack", "buyable": True, "cost": 1000},
@@ -27,7 +27,7 @@ def card_value(overall: int) -> int:
 
 
 def get_card(card_id: int):
-    with connect() as db:
+    with read_connection() as db:
         row = db.execute("SELECT * FROM cards WHERE card_id = ?", (card_id,)).fetchone()
     return row_dict(row)
 
@@ -35,7 +35,7 @@ def get_card(card_id: int):
 def search_cards(search: str = "", limit: int = 50, offset: int = 0):
     limit = max(1, min(int(limit), 100))
     offset = max(0, int(offset))
-    with connect() as db:
+    with read_connection() as db:
         if search:
             rows = db.execute(
                 "SELECT * FROM cards WHERE name LIKE ? OR CAST(card_id AS TEXT) = ? ORDER BY overall DESC LIMIT ? OFFSET ?",
@@ -56,13 +56,13 @@ def ensure_player(user_id: int, name: str):
 
 
 def get_player(user_id: int):
-    with connect() as db:
+    with read_connection() as db:
         row = db.execute("SELECT * FROM players WHERE user_id = ?", (user_id,)).fetchone()
     return row_dict(row)
 
 
 def get_inventory(user_id: int):
-    with connect() as db:
+    with read_connection() as db:
         rows = db.execute("""SELECT c.*, i.edition, i.battles_played AS owner_battles_played,
             i.battles_won AS owner_battles_won, i.rounds_played AS owner_rounds_played,
             i.rounds_won AS owner_rounds_won, i.trade_count
@@ -72,7 +72,7 @@ def get_inventory(user_id: int):
 
 
 def get_packs(user_id: int):
-    with connect() as db:
+    with read_connection() as db:
         row = db.execute("SELECT * FROM packs WHERE user_id = ?", (user_id,)).fetchone()
     if row is None:
         return {"user_id": user_id, "rare_player_pack": 0, "icon_pack": 0, "hero_pack": 0, "tester_pack": 0}
@@ -181,7 +181,7 @@ def toggle_wishlist(user_id: int, card_id: int):
 
 
 def get_decks(user_id: int):
-    with connect() as db:
+    with read_connection() as db:
         rows = db.execute("SELECT deck_name, cards FROM decks WHERE user_id = ? ORDER BY deck_name", (user_id,)).fetchall()
     return [{"name": row["deck_name"], "card_ids": [int(x) for x in (row["cards"] or "").split(",") if x.strip().isdigit()]} for row in rows]
 
@@ -196,9 +196,9 @@ def save_deck(user_id: int, deck_name: str, card_ids: list[int]):
             (user_id, *card_ids),
         ).fetchone()["n"]
         if owned != 5: raise GameError("Every card in the deck must be owned by the player.", 409)
-        db.execute("INSERT INTO decks (user_id, deck_name, cards) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", (user_id, name, ",".join(map(str, card_ids))))
-        existing = db.execute("SELECT rowid FROM decks WHERE user_id = ? AND deck_name = ?", (user_id, name)).fetchone()
-        if existing is None:
-            raise GameError("Could not save deck.")
-        db.execute("UPDATE decks SET cards = ? WHERE rowid = ?", (",".join(map(str, card_ids)), existing["rowid"]))
+        existing = db.execute("SELECT rowid FROM decks WHERE user_id = ? AND deck_name = ? ORDER BY rowid LIMIT 1", (user_id, name)).fetchone()
+        if existing:
+            db.execute("UPDATE decks SET cards = ? WHERE rowid = ?", (",".join(map(str, card_ids)), existing["rowid"]))
+        else:
+            db.execute("INSERT INTO decks (user_id, deck_name, cards) VALUES (?, ?, ?)", (user_id, name, ",".join(map(str, card_ids))))
     return {"name": name, "card_ids": card_ids}
