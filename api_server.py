@@ -94,7 +94,7 @@ async def status(request):
             "leaderboards": True,
             "battles": True,
             "trading": True,
-            "marketplace": False,
+            "marketplace": True,
         },
     })
 
@@ -336,6 +336,64 @@ async def battle_surrender(request):
     return success(services.surrender_battle(request.match_info["battle_id"], user_id))
 
 
+async def market_browse(request):
+    search = request.query.get("search", "").strip()[:100]
+    try:
+        page = int(request.query.get("page", "0"))
+        page_size = int(request.query.get("page_size", "5"))
+    except ValueError:
+        raise services.GameError("page and page_size must be integers.")
+    return success(services.browse_market(search, page, page_size))
+
+
+async def market_create(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+        card_id = int(payload["card_id"])
+        edition = int(payload["edition"])
+        price = int(payload["price"])
+        duration_hours = int(payload["duration_hours"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id, card_id, edition, price and duration_hours are required integers.")
+    return success(services.create_market_listing(user_id, card_id, edition, price, duration_hours), 201)
+
+
+async def market_buy(request):
+    payload = await read_json(request)
+    try:
+        buyer_id = int(payload["buyer_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("buyer_id is required.")
+    try:
+        result = services.buy_market_listing(int(request.match_info["listing_id"]), buyer_id)
+    except ValueError:
+        raise services.GameError("listing_id must be an integer.")
+    return success(result)
+
+
+async def market_cancel(request):
+    payload = await read_json(request)
+    try:
+        seller_id = int(payload["seller_id"])
+        listing_id = int(request.match_info["listing_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("seller_id and a valid listing_id are required.")
+    return success(services.cancel_market_listing(listing_id, seller_id))
+
+
+async def market_listed(request):
+    try:
+        user_id = int(request.match_info["user_id"])
+    except ValueError:
+        raise services.GameError("user_id must be an integer.")
+    return success({"listings": services.get_player_listings(user_id)})
+
+
+async def market_expire(request):
+    return success(services.expire_market_listings())
+
+
 async def create_drop(request):
     payload = await read_json(request)
     owner_id = payload.get("owner_id")
@@ -492,6 +550,12 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/battles/{battle_id}/next", battle_next_round)
     app.router.add_post("/api/v1/battles/{battle_id}/draw", battle_draw)
     app.router.add_post("/api/v1/battles/{battle_id}/surrender", battle_surrender)
+    app.router.add_get("/api/v1/market/listings", market_browse)
+    app.router.add_post("/api/v1/market/listings", market_create)
+    app.router.add_post("/api/v1/market/listings/{listing_id}/buy", market_buy)
+    app.router.add_post("/api/v1/market/listings/{listing_id}/cancel", market_cancel)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/market/listings", market_listed)
+    app.router.add_post("/api/v1/market/expire", market_expire)
     app.router.add_post("/api/v1/drops", create_drop)
     app.router.add_get("/api/v1/drops/{drop_id}", drop_detail)
     app.router.add_post("/api/v1/drops/{drop_id}/collect", drop_collect)
