@@ -1471,3 +1471,46 @@ def claim_secret_reward(user_id: int, secret_name: str):
         db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)", (user_id, card["card_id"], edition))
         db.execute(f"UPDATE players SET {flag} = 1 WHERE user_id = ?", (user_id,))
     return {"secret": secret_name, "card": dict(card), "edition": edition}
+
+
+
+# -------------------------------- Admin actions -------------------------------
+
+
+def admin_give_coins(user_id: int, amount: int):
+    if amount <= 0:
+        raise GameError("Amount must be positive.")
+    with transaction() as db:
+        player = db.execute("SELECT coins FROM players WHERE user_id = ?", (user_id,)).fetchone()
+        if player is None:
+            raise GameError("Player not found.", 404)
+        db.execute("UPDATE players SET coins = COALESCE(coins, 0) + ? WHERE user_id = ?", (amount, user_id))
+        balance = db.execute("SELECT coins FROM players WHERE user_id = ?", (user_id,)).fetchone()["coins"]
+    return {"user_id": user_id, "coins_added": amount, "balance": balance}
+
+
+def admin_give_card(user_id: int, card_id: int):
+    with transaction() as db:
+        if not db.execute("SELECT 1 FROM players WHERE user_id = ?", (user_id,)).fetchone():
+            raise GameError("Player not found.", 404)
+        card = db.execute("SELECT * FROM cards WHERE card_id = ?", (card_id,)).fetchone()
+        if card is None:
+            raise GameError("Card not found.", 404)
+        if db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (user_id, card_id)).fetchone():
+            raise GameError("Player already owns this card.", 409)
+        copies = int(card["copies"] or 0)
+        edition = copies if copies else 1
+        db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)", (user_id, card_id, edition))
+    return {"user_id": user_id, "card": dict(card), "edition": edition}
+
+
+def admin_remove_card(user_id: int, card_id: int):
+    with transaction() as db:
+        row = db.execute(
+            "SELECT rowid FROM inventories WHERE user_id = ? AND card_id = ? ORDER BY rowid LIMIT 1",
+            (user_id, card_id),
+        ).fetchone()
+        if row is None:
+            raise GameError("Player does not own this card.", 404)
+        db.execute("DELETE FROM inventories WHERE rowid = ?", (row["rowid"],))
+    return {"user_id": user_id, "card_id": card_id, "removed": True}
