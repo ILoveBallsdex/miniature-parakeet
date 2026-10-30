@@ -26,6 +26,7 @@ on failure.
 | GET | `/health` | Public process health check |
 | GET | `/api/v1/status` | API status and feature flags |
 | GET | `/api/v1/cards` | Search/list the card catalog |
+| GET | `/api/v1/cards/weight?search={name}` | Calculate a card's pack weight |
 | GET | `/api/v1/cards/{card_id}` | Card details |
 | GET | `/api/v1/cards/{card_id}/image` | Safely serve a card image from the configured asset folder |
 
@@ -37,11 +38,14 @@ on failure.
 | GET | `/api/v1/players/{user_id}` | Player profile and wallet |
 | GET | `/api/v1/players/{user_id}/stats` | Stats and inventory rarity counts |
 | GET | `/api/v1/players/{user_id}/inventory` | Inventory, editions and card stats |
+| GET | `/api/v1/players/{user_id}/cards/{card_id}/copies` | Inspect editions and stats for owned copies |
+| POST | `/api/v1/players/{user_id}/cards/{card_id}/minted` | Generate the minted inspection image |
 | GET | `/api/v1/players/{user_id}/wishlist` | Wishlist |
 | POST | `/api/v1/players/{user_id}/wishlist/{card_id}` | Toggle a wishlist entry |
 | GET | `/api/v1/players/{user_id}/packs` | Unopened pack counts |
 | GET | `/api/v1/players/{user_id}/decks` | Saved decks |
-| POST | `/api/v1/players/{user_id}/decks` | Save a five-card deck |
+| POST | `/api/v1/players/{user_id}/decks` | Create/update a five-card deck |
+| DELETE | `/api/v1/players/{user_id}/decks` | Delete a deck (JSON body contains name) |
 | GET | `/api/v1/players/{user_id}/achievements` | Achievement definitions and unlock status |
 | POST | `/api/v1/players/{user_id}/title` | Equip an unlocked title |
 | POST | `/api/v1/players/{user_id}/secrets/{secret}` | Claim one of the six one-time secret card rewards |
@@ -191,9 +195,18 @@ image paths. Check that the files are present on your computer:
 python scripts/verify_card_assets.py --database ./cards_game.db --asset-root .
 ```
 
-Before deployment, copy the referenced image files into the Python service's
-persistent asset folder and set `FUTBOT_ASSET_DIR` to that folder. The API's
-card image route only serves files inside this configured directory.
+After importing the card catalog, copy and normalize all image files into the
+new API asset folder:
+
+```bash
+python scripts/migrate_card_assets.py --source-db ./cards_game.db --source-root . --target-db ./futbot_api.db --target-assets ./assets
+```
+
+This reads the original DB, copies the images, and changes only the new API
+database's `image_path` values to safe relative filenames. It does not modify
+the original DB. Before deployment, place the copied files in the Python
+service's persistent asset folder and set `FUTBOT_ASSET_DIR` to that folder.
+The API serves only files inside this configured directory.
 
 ## Railway deployment (later)
 
