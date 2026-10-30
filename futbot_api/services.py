@@ -522,7 +522,9 @@ def _unlock_stat_achievements(db, user_id: int, stat_type: str):
         return
     value = int(row[stat_type] or 0)
     for threshold, achievement_id in thresholds[stat_type].items():
-        if value >= threshold:
+        if value >= threshold and db.execute(
+            "SELECT 1 FROM achievements WHERE achievement_id = ?", (achievement_id,)
+        ).fetchone():
             db.execute(
                 "INSERT OR IGNORE INTO user_achievements (user_id, achievement_id) VALUES (?, ?)",
                 (user_id, achievement_id),
