@@ -883,3 +883,23 @@ def cancel_exchange(session_id: str, user_id: int):
         db.execute("UPDATE exchange_sessions SET status = 'cancelled', updated_at = ? WHERE session_id = ?", (datetime.utcnow().isoformat(), session_id))
         row = _exchange_row(db, session_id)
     return dict(row)
+
+
+
+def get_trade_offer(trade_id: str):
+    with read_connection() as db:
+        row = db.execute("SELECT * FROM trade_offers WHERE trade_id = ?", (trade_id,)).fetchone()
+    if row is None:
+        raise GameError("Trade offer not found.", 404)
+    return dict(row)
+
+
+def get_exchange(session_id: str):
+    with read_connection() as db:
+        row = db.execute("SELECT * FROM exchange_sessions WHERE session_id = ?", (session_id,)).fetchone()
+    if row is None:
+        raise GameError("Exchange session not found.", 404)
+    result = dict(row)
+    result["p1_cards"] = json.loads(result["p1_cards"])
+    result["p2_cards"] = json.loads(result["p2_cards"])
+    return result
