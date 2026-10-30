@@ -95,6 +95,7 @@ async def status(request):
             "leaderboards": True,
             "battles": True,
             "trading": True,
+            "trade_up": True,
             "marketplace": True,
         },
     })
@@ -408,6 +409,29 @@ async def battle_surrender(request):
     return success(services.surrender_battle(request.match_info["battle_id"], user_id))
 
 
+async def trade_up_eligible(request):
+    user_id = int(request.match_info["user_id"])
+    tier = request.match_info["tier"]
+    cards = services.eligible_trade_up_cards(user_id, tier)
+    return success({"tier": tier, "cards": cards, "count": len(cards)})
+
+
+async def trade_up_execute(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+        tier = payload["tier"]
+        row_ids = payload["inventory_row_ids"]
+        if not isinstance(row_ids, list):
+            raise TypeError()
+        row_ids = [int(value) for value in row_ids]
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id, tier and inventory_row_ids are required.")
+    if not isinstance(tier, str):
+        raise services.GameError("tier must be a string.")
+    return success(services.execute_trade_up(user_id, tier, row_ids))
+
+
 async def market_browse(request):
     search = request.query.get("search", "").strip()[:100]
     try:
@@ -632,6 +656,8 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/battles/{battle_id}/next", battle_next_round)
     app.router.add_post("/api/v1/battles/{battle_id}/draw", battle_draw)
     app.router.add_post("/api/v1/battles/{battle_id}/surrender", battle_surrender)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/trade-up/{tier}", trade_up_eligible)
+    app.router.add_post("/api/v1/trade-up", trade_up_execute)
     app.router.add_get("/api/v1/market/listings", market_browse)
     app.router.add_post("/api/v1/market/listings", market_create)
     app.router.add_post("/api/v1/market/listings/{listing_id}/buy", market_buy)
