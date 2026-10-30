@@ -91,7 +91,7 @@ async def status(request):
             "daily_rewards": True,
             "starter_pack": True,
             "leaderboards": True,
-            "battles": False,
+            "battles": True,
             "trading": False,
             "marketplace": False,
         },
@@ -242,6 +242,99 @@ async def leaderboard(request):
     ]})
 
 
+async def create_battle(request):
+    payload = await read_json(request)
+    try:
+        player1_id = int(payload["player1_id"])
+        player2_id = int(payload["player2_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("player1_id and player2_id are required.")
+    return success(services.create_battle(player1_id, player2_id), 201)
+
+
+async def battle_detail(request):
+    return success(services.get_battle(request.match_info["battle_id"]))
+
+
+async def battle_accept(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id is required.")
+    return success(services.accept_battle(request.match_info["battle_id"], user_id))
+
+
+async def battle_decline(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id is required.")
+    return success(services.decline_battle(request.match_info["battle_id"], user_id))
+
+
+async def battle_select_deck(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+        deck_name = payload["deck_name"]
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id and deck_name are required.")
+    if not isinstance(deck_name, str):
+        raise services.GameError("deck_name must be a string.")
+    return success(services.select_battle_deck(request.match_info["battle_id"], user_id, deck_name))
+
+
+async def battle_action(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+        action = payload["action"]
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id and action are required.")
+    if not isinstance(action, str):
+        raise services.GameError("action must be a string.")
+    return success(services.choose_battle_action(request.match_info["battle_id"], user_id, action))
+
+
+async def battle_card(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+        card_id = int(payload["card_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id and card_id are required.")
+    return success(services.choose_battle_card(request.match_info["battle_id"], user_id, card_id))
+
+
+async def battle_next_round(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id is required.")
+    return success(services.ready_next_round(request.match_info["battle_id"], user_id))
+
+
+async def battle_draw(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id is required.")
+    return success(services.offer_battle_draw(request.match_info["battle_id"], user_id))
+
+
+async def battle_surrender(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id is required.")
+    return success(services.surrender_battle(request.match_info["battle_id"], user_id))
+
+
 async def player_decks(request):
     user_id = int(request.match_info["user_id"])
     if services.get_player(user_id) is None:
@@ -284,6 +377,16 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/players/{user_id:\\d+}/daily/collect", daily_collect)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/starter-pack", starter_pack)
     app.router.add_get("/api/v1/leaderboards/{stat}", leaderboard)
+    app.router.add_post("/api/v1/battles", create_battle)
+    app.router.add_get("/api/v1/battles/{battle_id}", battle_detail)
+    app.router.add_post("/api/v1/battles/{battle_id}/accept", battle_accept)
+    app.router.add_post("/api/v1/battles/{battle_id}/decline", battle_decline)
+    app.router.add_post("/api/v1/battles/{battle_id}/decks", battle_select_deck)
+    app.router.add_post("/api/v1/battles/{battle_id}/action", battle_action)
+    app.router.add_post("/api/v1/battles/{battle_id}/card", battle_card)
+    app.router.add_post("/api/v1/battles/{battle_id}/next", battle_next_round)
+    app.router.add_post("/api/v1/battles/{battle_id}/draw", battle_draw)
+    app.router.add_post("/api/v1/battles/{battle_id}/surrender", battle_surrender)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/decks", save_player_deck)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/wishlist/{card_id:\\d+}", toggle_wishlist)
     app.router.add_get("/api/v1/packs/catalog", pack_catalog)
