@@ -107,12 +107,12 @@ class FutBotServiceTests(unittest.TestCase):
         self.assertEqual(services.get_player(456)["coins"], 110)
 
     def test_battle_round(self):
-        for card_id in range(1, 6):
+        for card_id in [1, 2, 3, 10, 11]:
             self.add_owned_card(123, card_id)
-        for card_id in range(10, 15):
+        for card_id in [12, 13, 14, 15, 20]:
             self.add_owned_card(456, card_id)
-        services.save_deck(123, "A", [1, 2, 3, 4, 5])
-        services.save_deck(456, "B", [10, 11, 12, 13, 14])
+        services.save_deck(123, "A", [1, 2, 3, 10, 11])
+        services.save_deck(456, "B", [12, 13, 14, 15, 20])
         battle = services.create_battle(123, 456)
         battle_id = battle["battle_id"]
         services.accept_battle(battle_id, 456)
@@ -120,7 +120,7 @@ class FutBotServiceTests(unittest.TestCase):
         services.select_battle_deck(battle_id, 456, "B")
         services.choose_battle_action(battle_id, 123, "attack")
         services.choose_battle_card(battle_id, 123, 1)
-        result = services.choose_battle_card(battle_id, 456, 10)
+        result = services.choose_battle_card(battle_id, 456, 12)
         self.assertEqual(result["state"]["phase"], "RESULT")
         self.assertEqual(result["state"]["p1_wins"], 1)
 
