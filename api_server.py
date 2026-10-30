@@ -88,6 +88,9 @@ async def status(request):
             "packs": True,
             "wishlists": True,
             "decks": True,
+            "daily_rewards": True,
+            "starter_pack": True,
+            "leaderboards": True,
             "battles": False,
             "trading": False,
             "marketplace": False,
@@ -194,6 +197,51 @@ async def toggle_wishlist(request):
     return success(services.toggle_wishlist(user_id, card_id))
 
 
+async def daily_claim(request):
+    user_id = int(request.match_info["user_id"])
+    if services.get_player(user_id) is None:
+        raise services.GameError("Player not found.", 404)
+    return success(services.claim_daily(user_id))
+
+
+async def daily_collect(request):
+    user_id = int(request.match_info["user_id"])
+    payload = await read_json(request)
+    try:
+        card_id = int(payload["card_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("card_id must be an integer.")
+    return success(services.collect_daily(user_id, card_id))
+
+
+async def starter_pack(request):
+    user_id = int(request.match_info["user_id"])
+    return success(services.claim_starter_pack(user_id))
+
+
+async def leaderboard(request):
+    stat = request.match_info["stat"]
+    allowed = {
+        "battles_won", "battles_played", "battles_lost", "rounds_won",
+        "rounds_played", "rounds_lost", "coins", "cards_dropped", "cards_sold",
+    }
+    if stat not in allowed:
+        raise services.GameError("Unsupported leaderboard statistic.")
+    try:
+        limit = max(1, min(int(request.query.get("limit", "10")), 100))
+    except ValueError:
+        raise services.GameError("limit must be an integer.")
+    from futbot_api.database import read_connection
+    with read_connection() as db:
+        rows = db.execute(
+            f"SELECT user_id, name, {stat} AS value FROM players ORDER BY {stat} DESC, name ASC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return success({"stat": stat, "entries": [
+        {"rank": index + 1, **dict(row)} for index, row in enumerate(rows)
+    ]})
+
+
 async def player_decks(request):
     user_id = int(request.match_info["user_id"])
     if services.get_player(user_id) is None:
@@ -232,6 +280,10 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_get("/api/v1/players/{user_id:\\d+}/inventory", player_inventory)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/packs", player_packs)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/decks", player_decks)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/daily/claim", daily_claim)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/daily/collect", daily_collect)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/starter-pack", starter_pack)
+    app.router.add_get("/api/v1/leaderboards/{stat}", leaderboard)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/decks", save_player_deck)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/wishlist/{card_id:\\d+}", toggle_wishlist)
     app.router.add_get("/api/v1/packs/catalog", pack_catalog)
