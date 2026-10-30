@@ -82,7 +82,7 @@ def _clean_catalog_card(payload: dict, creating: bool):
         if field != "card_id" and not 0 <= value <= 99:
             raise GameError(f"{field} must be between 0 and 99.")
         result[field] = value
-    for field in ("name", "card_rarity", "card_type", "player_id", "height", "club", "position", "league", "nation"):
+    for field in ("name", "card_rarity", "card_type", "player_id", "height", "club", "position", "league", "nation", "image_path"):
         if field not in payload:
             continue
         value = payload[field]
