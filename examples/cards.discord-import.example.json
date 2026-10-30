@@ -1,0 +1,21 @@
+{
+  "cards": [
+    {
+      "card_id": 10001,
+      "name": "Example Player",
+      "attack": 90,
+      "defense": 75,
+      "speed": 88,
+      "overall": 89,
+      "card_rarity": "Rare",
+      "card_type": "Standard",
+      "player_id": "example_player",
+      "club": "Example FC",
+      "position": "ST",
+      "league": "Example League",
+      "nation": "Example Nation",
+      "height": "180 cm",
+      "image_base64": "REPLACE_WITH_BASE64_ENCODED_IMAGE"
+    }
+  ]
+}
