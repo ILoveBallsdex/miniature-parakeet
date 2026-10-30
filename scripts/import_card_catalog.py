@@ -65,6 +65,22 @@ def main():
         values = [[row[column] for column in columns] for row in rows]
 
         target.execute("BEGIN IMMEDIATE")
+        # The destination is the new game database. Clear any previous player
+        # state there, but never modify the source database.
+        reset_tables = [
+            "pending_daily_rewards", "drop_sessions", "trade_offers",
+            "exchange_sessions", "battles", "market_listings",
+            "friend_requests", "friendships", "user_achievements",
+            "wishlists", "decks", "packs", "inventories", "players",
+        ]
+        target_tables = {
+            row[0] for row in target.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        for table in reset_tables:
+            if table in target_tables:
+                target.execute(f'DELETE FROM "{table}"')
         target.execute("DELETE FROM cards")
         target.executemany(f"INSERT INTO cards ({quoted}) VALUES ({placeholders})", values)
 
