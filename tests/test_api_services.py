@@ -137,6 +137,38 @@ class FutBotServiceTests(unittest.TestCase):
         self.assertEqual(result["state"]["phase"], "RESULT")
         self.assertEqual(result["state"]["p1_wins"], 1)
 
+    def test_card_weight(self):
+        result = services.get_card_weight("Test Standard")
+        self.assertEqual(result["card_id"], 3)
+        self.assertGreater(result["weight"], 0)
+
+    def test_card_drop(self):
+        drop = services.create_card_drop(123)
+        collected = services.collect_card_drop(drop["drop_id"], 123, "Test User")
+        self.assertEqual(collected["collected_by"], 123)
+        self.assertEqual(services.get_player(123)["cards_dropped"], 1)
+
+    def test_friend_requests(self):
+        request = services.add_friend_request(123, 456)
+        self.assertEqual(request["status"], "pending")
+        services.resolve_friend_request(request["request_id"], 456, True)
+        self.assertEqual(services.list_friends(123)[0]["friend_id"], 456)
+
+    def test_admin_management(self):
+        services.admin_give_coins(123, 500)
+        services.admin_give_card(123, 1)
+        result = services.admin_remove_card(123, 1)
+        self.assertEqual(result["removed_copies"], 1)
+        self.assertEqual(services.get_player(123)["coins"], 500)
+
+    def test_battle_achievement_unlock(self):
+        with transaction() as db:
+            db.execute("INSERT INTO achievements (achievement_id, title, description) VALUES (3, 'First Win', 'Win one battle')")
+            db.execute("UPDATE players SET battles_won = 1 WHERE user_id = 123")
+            services._unlock_stat_achievements(db, 123, "battles_won")
+        self.assertEqual(len(services.get_achievements(123)), 1)
+        self.assertEqual(services.get_achievements(123)[0]["unlocked"], 1)
+
     def test_minted_card_image_generation(self):
         image_path = os.path.join(self.temp_dir.name, "card.png")
         Image.new("RGBA", (500, 700), (20, 120, 60, 255)).save(image_path)
