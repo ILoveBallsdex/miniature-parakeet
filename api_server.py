@@ -92,7 +92,7 @@ async def status(request):
             "starter_pack": True,
             "leaderboards": True,
             "battles": True,
-            "trading": False,
+            "trading": True,
             "marketplace": False,
         },
     })
@@ -335,6 +335,83 @@ async def battle_surrender(request):
     return success(services.surrender_battle(request.match_info["battle_id"], user_id))
 
 
+async def create_trade(request):
+    payload = await read_json(request)
+    try:
+        values = [int(payload[key]) for key in ("sender_id", "recipient_id", "sender_card_id", "recipient_card_id")]
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("sender_id, recipient_id, sender_card_id and recipient_card_id are required.")
+    return success(services.create_trade_offer(*values), 201)
+
+
+async def trade_detail(request):
+    return success(services.get_trade_offer(request.match_info["trade_id"]))
+
+
+async def trade_accept(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id is required.")
+    return success(services.resolve_trade_offer(request.match_info["trade_id"], user_id, True))
+
+
+async def trade_decline(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id is required.")
+    return success(services.resolve_trade_offer(request.match_info["trade_id"], user_id, False))
+
+
+async def create_exchange(request):
+    payload = await read_json(request)
+    try:
+        p1 = int(payload["player1_id"])
+        p2 = int(payload["player2_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("player1_id and player2_id are required.")
+    return success(services.create_exchange(p1, p2), 201)
+
+
+async def exchange_detail(request):
+    return success(services.get_exchange(request.match_info["session_id"]))
+
+
+async def exchange_offer(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+        card_ids = payload.get("card_ids", [])
+        coins = int(payload.get("coins", 0))
+        if not isinstance(card_ids, list):
+            raise TypeError()
+        card_ids = [int(card_id) for card_id in card_ids]
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id, a card_ids array, and an integer coins value are required.")
+    return success(services.update_exchange_offer(request.match_info["session_id"], user_id, card_ids, coins))
+
+
+async def exchange_action(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id is required.")
+    action = request.match_info["action"]
+    if action == "lock":
+        result = services.lock_exchange(request.match_info["session_id"], user_id)
+    elif action == "confirm":
+        result = services.confirm_exchange(request.match_info["session_id"], user_id)
+    elif action == "cancel":
+        result = services.cancel_exchange(request.match_info["session_id"], user_id)
+    else:
+        raise services.GameError("Unknown exchange action.")
+    return success(result)
+
+
 async def player_decks(request):
     user_id = int(request.match_info["user_id"])
     if services.get_player(user_id) is None:
@@ -387,6 +464,14 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/battles/{battle_id}/next", battle_next_round)
     app.router.add_post("/api/v1/battles/{battle_id}/draw", battle_draw)
     app.router.add_post("/api/v1/battles/{battle_id}/surrender", battle_surrender)
+    app.router.add_post("/api/v1/trades", create_trade)
+    app.router.add_get("/api/v1/trades/{trade_id}", trade_detail)
+    app.router.add_post("/api/v1/trades/{trade_id}/accept", trade_accept)
+    app.router.add_post("/api/v1/trades/{trade_id}/decline", trade_decline)
+    app.router.add_post("/api/v1/exchanges", create_exchange)
+    app.router.add_get("/api/v1/exchanges/{session_id}", exchange_detail)
+    app.router.add_put("/api/v1/exchanges/{session_id}/offer", exchange_offer)
+    app.router.add_post("/api/v1/exchanges/{session_id}/{action:lock|confirm|cancel}", exchange_action)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/decks", save_player_deck)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/wishlist/{card_id:\\d+}", toggle_wishlist)
     app.router.add_get("/api/v1/packs/catalog", pack_catalog)
