@@ -1520,14 +1520,14 @@ def admin_give_card(user_id: int, card_id: int):
 
 def admin_remove_card(user_id: int, card_id: int):
     with transaction() as db:
-        row = db.execute(
-            "SELECT rowid FROM inventories WHERE user_id = ? AND card_id = ? ORDER BY rowid LIMIT 1",
+        rows = db.execute(
+            "SELECT rowid FROM inventories WHERE user_id = ? AND card_id = ?",
             (user_id, card_id),
-        ).fetchone()
-        if row is None:
+        ).fetchall()
+        if not rows:
             raise GameError("Player does not own this card.", 404)
-        db.execute("DELETE FROM inventories WHERE rowid = ?", (row["rowid"],))
-    return {"user_id": user_id, "card_id": card_id, "removed": True}
+        db.execute("DELETE FROM inventories WHERE user_id = ? AND card_id = ?", (user_id, card_id))
+    return {"user_id": user_id, "card_id": card_id, "removed_copies": len(rows)}
 
 
 
