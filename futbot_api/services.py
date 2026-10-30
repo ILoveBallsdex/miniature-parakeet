@@ -354,8 +354,8 @@ def claim_starter_pack(user_id: int):
 
         selections = []
         groups = [
-            ("overall BETWEEN 70 AND 79", 6),
-            ("overall BETWEEN 80 AND 85", 3),
+            ("overall BETWEEN 70 AND 79 AND card_type != 'Unique'", 6),
+            ("overall BETWEEN 80 AND 85 AND card_type != 'Unique'", 3),
             ("overall > 85 AND card_type = 'Standard'", 1),
         ]
         excluded = []
@@ -962,14 +962,15 @@ def create_card_drop(owner_id: int | None = None):
         now = datetime.utcnow()
         drop_id = uuid.uuid4().hex
         expires = now + timedelta(seconds=120)
-        db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card["card_id"],))
         if owner_id is not None:
             db.execute("UPDATE players SET cards_dropped = COALESCE(cards_dropped, 0) + 1 WHERE user_id = ?", (owner_id,))
         db.execute(
             "INSERT INTO drop_sessions (drop_id, card_id, owner_id, created_at, expires_at, status) VALUES (?, ?, ?, ?, ?, 'active')",
             (drop_id, card["card_id"], owner_id, now.isoformat(), expires.isoformat()),
         )
-    return {"drop_id": drop_id, "owner_id": owner_id, "card": dict(card), "owner_priority_seconds": 10 if owner_id is not None else 0, "expires_at": expires.isoformat()}
+    card_data = dict(card)
+    card_data["copies"] = int(card_data.get("copies") or 0) + 1
+    return {"drop_id": drop_id, "owner_id": owner_id, "card": card_data, "owner_priority_seconds": 10 if owner_id is not None else 0, "expires_at": expires.isoformat()}
 
 
 def get_card_drop(drop_id: str):
@@ -1010,14 +1011,16 @@ def collect_card_drop(drop_id: str, user_id: int, username: str):
             raise GameError("You already own this card.", 409)
         card = db.execute("SELECT * FROM cards WHERE card_id = ?", (drop["card_id"],)).fetchone() if not expired else None
         if not expired:
+            edition = int(card["copies"] or 0) + 1
+            db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (drop["card_id"],))
             db.execute(
-                "INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, COALESCE((SELECT copies FROM cards WHERE card_id = ?), 1))",
-                (user_id, drop["card_id"], drop["card_id"]),
+                "INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)",
+                (user_id, drop["card_id"], edition),
             )
             db.execute("UPDATE drop_sessions SET status = 'collected' WHERE drop_id = ?", (drop_id,))
     if expired:
         raise GameError("This drop has expired.", 410)
-    return {"drop_id": drop_id, "collected_by": user_id, "card": dict(card)}
+    return {"drop_id": drop_id, "collected_by": user_id, "card": dict(card), "edition": edition}
 
 
 
@@ -1513,7 +1516,8 @@ def admin_give_card(user_id: int, card_id: int):
         if db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (user_id, card_id)).fetchone():
             raise GameError("Player already owns this card.", 409)
         copies = int(card["copies"] or 0)
-        edition = copies if copies else 1
+        edition = copies + 1
+        db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card_id,))
         db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)", (user_id, card_id, edition))
     return {"user_id": user_id, "card": dict(card), "edition": edition}
 
