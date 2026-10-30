@@ -48,6 +48,97 @@ def search_cards(search: str = "", limit: int = 50, offset: int = 0):
     return [dict(row) for row in rows]
 
 
+
+# --------------------------- Admin card catalog ------------------------------
+
+CARD_FIELDS = (
+    "player_id", "name", "attack", "defense", "speed", "height", "club",
+    "position", "overall", "image_path", "card_rarity", "card_type", "league", "nation",
+)
+CARD_INTEGER_FIELDS = {"attack", "defense", "speed", "overall"}
+
+
+def _clean_catalog_card(payload: dict, creating: bool):
+    if not isinstance(payload, dict):
+        raise GameError("Card data must be an object.")
+    required = ("card_id", "name", "attack", "defense", "speed", "overall", "card_rarity", "card_type")
+    if creating:
+        missing = [field for field in required if field not in payload or payload[field] is None]
+        if missing:
+            raise GameError("Missing card fields: " + ", ".join(missing))
+    result = {}
+    for field in ("card_id", *CARD_INTEGER_FIELDS):
+        if field not in payload or payload[field] is None:
+            continue
+        value = payload[field]
+        if isinstance(value, bool):
+            raise GameError(f"{field} must be an integer.")
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            raise GameError(f"{field} must be an integer.")
+        if field == "card_id" and value <= 0:
+            raise GameError("card_id must be greater than zero.")
+        if field != "card_id" and not 0 <= value <= 99:
+            raise GameError(f"{field} must be between 0 and 99.")
+        result[field] = value
+    for field in ("name", "card_rarity", "card_type", "player_id", "height", "club", "position", "league", "nation"):
+        if field not in payload:
+            continue
+        value = payload[field]
+        if value is None and field not in ("name", "card_rarity", "card_type"):
+            result[field] = None
+            continue
+        if not isinstance(value, str) or not value.strip():
+            raise GameError(f"{field} must be a non-empty string.")
+        result[field] = value.strip()[:100]
+    if creating:
+        result.setdefault("player_id", str(result["card_id"]))
+    return result
+
+
+def create_catalog_card(payload: dict):
+    values = _clean_catalog_card(payload, True)
+    columns = ("card_id", *CARD_FIELDS)
+    values.setdefault("image_path", payload.get("image_path"))
+    if not values.get("image_path"):
+        raise GameError("A card image is required.")
+    with transaction() as db:
+        if db.execute("SELECT 1 FROM cards WHERE card_id = ?", (values["card_id"],)).fetchone():
+            raise GameError("A card with that ID already exists. Use replace-card instead.", 409)
+        db.execute(
+            f"INSERT INTO cards ({','.join(columns)}) VALUES ({','.join('?' for _ in columns)})",
+            tuple(values.get(column) for column in columns),
+        )
+        row = db.execute("SELECT * FROM cards WHERE card_id = ?", (values["card_id"],)).fetchone()
+    return dict(row)
+
+
+def update_catalog_card(card_id: int, payload: dict):
+    values = _clean_catalog_card(payload, False)
+    values.pop("card_id", None)
+    if not values:
+        raise GameError("Provide at least one card field to replace.")
+    with transaction() as db:
+        if not db.execute("SELECT 1 FROM cards WHERE card_id = ?", (card_id,)).fetchone():
+            raise GameError("Card not found.", 404)
+        assignments = ", ".join(f"{field} = ?" for field in values)
+        db.execute(f"UPDATE cards SET {assignments} WHERE card_id = ?", (*values.values(), card_id))
+        row = db.execute("SELECT * FROM cards WHERE card_id = ?", (card_id,)).fetchone()
+    return dict(row)
+
+
+def delete_catalog_card(card_id: int):
+    with transaction() as db:
+        if not db.execute("SELECT 1 FROM cards WHERE card_id = ?", (card_id,)).fetchone():
+            raise GameError("Card not found.", 404)
+        owned = db.execute("SELECT COUNT(*) AS n FROM inventories WHERE card_id = ?", (card_id,)).fetchone()["n"]
+        if owned:
+            raise GameError(f"Cannot delete this card yet: {owned} copy/copies are owned by players. Remove those copies first.", 409)
+        db.execute("DELETE FROM wishlists WHERE card_id = ?", (card_id,))
+        db.execute("DELETE FROM cards WHERE card_id = ?", (card_id,))
+    return {"card_id": card_id, "deleted": True}
+
 def ensure_player(user_id: int, name: str):
     if user_id <= 0 or not name.strip():
         raise GameError("A valid user ID and display name are required.")
