@@ -645,6 +645,15 @@ async def exchange_action(request):
     return success(result)
 
 
+async def delete_player_deck(request):
+    user_id = int(request.match_info["user_id"])
+    payload = await read_json(request)
+    name = payload.get("name")
+    if not isinstance(name, str):
+        raise services.GameError("name must be a string.")
+    return success(services.delete_deck(user_id, name))
+
+
 async def player_decks(request):
     user_id = int(request.match_info["user_id"])
     if services.get_player(user_id) is None:
@@ -731,6 +740,7 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_put("/api/v1/exchanges/{session_id}/offer", exchange_offer)
     app.router.add_post("/api/v1/exchanges/{session_id}/{action:lock|confirm|cancel}", exchange_action)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/decks", save_player_deck)
+    app.router.add_delete("/api/v1/players/{user_id:\\d+}/decks", delete_player_deck)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/wishlist/{card_id:\\d+}", toggle_wishlist)
     app.router.add_get("/api/v1/packs/catalog", pack_catalog)
     app.router.add_post("/api/v1/packs/buy", buy_pack)
