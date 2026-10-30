@@ -1,9 +1,8 @@
 """
-FutBot HTTP API entrypoint.
+FutBot HTTP API.
 
-This process intentionally does not import bot.py or connect to Discord.
-It is the first step toward moving FutBot's game logic behind an API that
-the existing Node.js Discord bot can call.
+This service owns FutBot game data and rules. It deliberately does not import
+bot.py, create a Discord client, or require a Discord bot token.
 """
 
 import hmac
@@ -12,6 +11,9 @@ import os
 
 from aiohttp import web
 from dotenv import load_dotenv
+
+from futbot_api import services
+from futbot_api.database import init_database
 
 load_dotenv()
 
@@ -24,65 +26,229 @@ logger = logging.getLogger("futbot.api")
 
 @web.middleware
 async def api_key_middleware(request: web.Request, handler):
-    # Railway health checks should not need an API key.
     if request.path == "/health":
         return await handler(request)
 
     expected_key = request.app["api_key"]
     supplied_key = request.headers.get("X-API-Key", "")
-
     if not supplied_key or not hmac.compare_digest(supplied_key, expected_key):
         raise web.HTTPUnauthorized(
             text='{"error":"Missing or invalid API key"}',
             content_type="application/json",
         )
-
     return await handler(request)
 
 
-async def health(request: web.Request) -> web.Response:
-    return web.json_response(
-        {
-            "ok": True,
-            "service": "futbot-api",
-        }
-    )
+def success(data, status=200):
+    return web.json_response({"ok": True, "data": data}, status=status)
 
 
-async def status(request: web.Request) -> web.Response:
-    return web.json_response(
-        {
-            "ok": True,
-            "service": "futbot-api",
-            "api_version": 1,
-            "discord_gateway_connected": False,
-            "game_routes_ready": False,
-        }
-    )
+def error(message, status=400):
+    return web.json_response({"ok": False, "error": message}, status=status)
+
+
+async def read_json(request):
+    try:
+        payload = await request.json()
+    except (ValueError, web.HTTPException):
+        raise services.GameError("Request body must be valid JSON.")
+    if not isinstance(payload, dict):
+        raise services.GameError("Request body must be a JSON object.")
+    return payload
+
+
+@web.middleware
+async def error_middleware(request: web.Request, handler):
+    try:
+        return await handler(request)
+    except services.GameError as exc:
+        return error(str(exc), exc.status)
+    except web.HTTPException:
+        raise
+    except Exception:
+        logger.exception("Unhandled API error on %s %s", request.method, request.path)
+        return error("Internal server error.", 500)
+
+
+async def health(request):
+    return success({"service": "futbot-api"})
+
+
+async def status(request):
+    return success({
+        "service": "futbot-api",
+        "api_version": 1,
+        "discord_gateway_connected": False,
+        "database": "initialized",
+        "features": {
+            "cards": True,
+            "players": True,
+            "inventory": True,
+            "economy": True,
+            "packs": True,
+            "wishlists": True,
+            "decks": True,
+            "battles": False,
+            "trading": False,
+            "marketplace": False,
+        },
+    })
+
+
+async def card_list(request):
+    search = request.query.get("search", "").strip()[:100]
+    try:
+        limit = int(request.query.get("limit", "50"))
+        offset = int(request.query.get("offset", "0"))
+    except ValueError:
+        raise services.GameError("limit and offset must be integers.")
+    cards = services.search_cards(search, limit, offset)
+    return success({"cards": cards, "count": len(cards), "limit": max(1, min(limit, 100)), "offset": max(0, offset)})
+
+
+async def card_detail(request):
+    card_id = int(request.match_info["card_id"])
+    card = services.get_card(card_id)
+    if card is None:
+        raise services.GameError("Card not found.", 404)
+    return success(card)
+
+
+async def create_or_update_player(request):
+    user_id = int(request.match_info["user_id"])
+    payload = await read_json(request)
+    name = payload.get("name")
+    if not isinstance(name, str):
+        raise services.GameError("name must be a string.")
+    return success(services.ensure_player(user_id, name))
+
+
+async def player_detail(request):
+    user_id = int(request.match_info["user_id"])
+    player = services.get_player(user_id)
+    if player is None:
+        raise services.GameError("Player not found.", 404)
+    return success(player)
+
+
+async def player_inventory(request):
+    user_id = int(request.match_info["user_id"])
+    player = services.get_player(user_id)
+    if player is None:
+        raise services.GameError("Player not found.", 404)
+    cards = services.get_inventory(user_id)
+    return success({"user_id": user_id, "cards": cards, "count": len(cards)})
+
+
+async def player_packs(request):
+    user_id = int(request.match_info["user_id"])
+    if services.get_player(user_id) is None:
+        raise services.GameError("Player not found.", 404)
+    return success(services.get_packs(user_id))
+
+
+async def pack_catalog(request):
+    return success({
+        "packs": [
+            {"id": pack_id, **pack}
+            for pack_id, pack in services.PACKS.items()
+        ]
+    })
+
+
+async def buy_pack(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+        pack_id = int(payload["pack_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id and pack_id must be integers.")
+    return success(services.buy_pack(user_id, pack_id))
+
+
+async def open_pack(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+        pack_id = int(payload["pack_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id and pack_id must be integers.")
+    return success(services.open_pack(user_id, pack_id))
+
+
+async def sell_cards(request):
+    payload = await read_json(request)
+    try:
+        user_id = int(payload["user_id"])
+        card_ids = [int(card_id) for card_id in payload["card_ids"]]
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("user_id and card_ids are required.")
+    return success(services.sell_cards(user_id, card_ids))
+
+
+async def toggle_wishlist(request):
+    user_id = int(request.match_info["user_id"])
+    card_id = int(request.match_info["card_id"])
+    if services.get_player(user_id) is None:
+        raise services.GameError("Player not found.", 404)
+    return success(services.toggle_wishlist(user_id, card_id))
+
+
+async def player_decks(request):
+    user_id = int(request.match_info["user_id"])
+    if services.get_player(user_id) is None:
+        raise services.GameError("Player not found.", 404)
+    return success({"decks": services.get_decks(user_id)})
+
+
+async def save_player_deck(request):
+    user_id = int(request.match_info["user_id"])
+    payload = await read_json(request)
+    if services.get_player(user_id) is None:
+        raise services.GameError("Player not found.", 404)
+    try:
+        name = payload["name"]
+        card_ids = [int(card_id) for card_id in payload["card_ids"]]
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("name and card_ids are required.")
+    if not isinstance(name, str):
+        raise services.GameError("name must be a string.")
+    return success(services.save_deck(user_id, name, card_ids))
 
 
 def create_app(api_key: str) -> web.Application:
     app = web.Application(
-        middlewares=[api_key_middleware],
+        middlewares=[error_middleware, api_key_middleware],
         client_max_size=1024 * 1024,
     )
     app["api_key"] = api_key
+
     app.router.add_get("/health", health)
     app.router.add_get("/api/v1/status", status)
+    app.router.add_get("/api/v1/cards", card_list)
+    app.router.add_get("/api/v1/cards/{card_id:\\d+}", card_detail)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}", create_or_update_player)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}", player_detail)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/inventory", player_inventory)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/packs", player_packs)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/decks", player_decks)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/decks", save_player_deck)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/wishlist/{card_id:\\d+}", toggle_wishlist)
+    app.router.add_get("/api/v1/packs/catalog", pack_catalog)
+    app.router.add_post("/api/v1/packs/buy", buy_pack)
+    app.router.add_post("/api/v1/packs/open", open_pack)
+    app.router.add_post("/api/v1/inventory/sell", sell_cards)
     return app
 
 
-def main() -> None:
+def main():
     api_key = os.getenv("FUTBOT_API_KEY")
     if not api_key:
-        raise RuntimeError(
-            "FUTBOT_API_KEY is required. Set it in your local .env file "
-            "or your deployment environment."
-        )
+        raise RuntimeError("FUTBOT_API_KEY is required. Set it in the environment.")
 
+    init_database()
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("PORT", os.getenv("API_PORT", "8000")))
-
     logger.info("Starting FutBot API on %s:%s", host, port)
     web.run_app(create_app(api_key), host=host, port=port)
 
