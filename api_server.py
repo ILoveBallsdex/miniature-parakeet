@@ -8,6 +8,7 @@ bot.py, create a Discord client, or require a Discord bot token.
 import hmac
 import logging
 import os
+from pathlib import Path
 
 from aiohttp import web
 from dotenv import load_dotenv
@@ -116,6 +117,25 @@ async def card_detail(request):
     if card is None:
         raise services.GameError("Card not found.", 404)
     return success(card)
+
+
+async def card_image(request):
+    card = services.get_card(int(request.match_info["card_id"]))
+    if card is None:
+        raise services.GameError("Card not found.", 404)
+    image_path = card.get("image_path")
+    if not image_path:
+        raise services.GameError("This card does not have an image path.", 404)
+    asset_root = Path(os.getenv("FUTBOT_ASSET_DIR", ".")).expanduser().resolve()
+    candidate = Path(image_path)
+    if not candidate.is_absolute():
+        candidate = asset_root / candidate
+    resolved = candidate.resolve()
+    if not resolved.is_relative_to(asset_root):
+        raise services.GameError("Card image path is outside the configured asset directory.", 403)
+    if resolved.suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp", ".gif") or not resolved.is_file():
+        raise services.GameError("Card image file was not found on the API service.", 404)
+    return web.FileResponse(resolved)
 
 
 async def create_or_update_player(request):
@@ -583,6 +603,7 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_get("/api/v1/status", status)
     app.router.add_get("/api/v1/cards", card_list)
     app.router.add_get("/api/v1/cards/{card_id:\\d+}", card_detail)
+    app.router.add_get("/api/v1/cards/{card_id:\\d+}/image", card_image)
     app.router.add_post("/api/v1/players/{user_id:\\d+}", create_or_update_player)
     app.router.add_get("/api/v1/players/{user_id:\\d+}", player_detail)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/stats", player_stats)
