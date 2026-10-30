@@ -1,4 +1,4 @@
-"""Basic regression tests for the first standalone FutBot API services."""
+"""Regression tests for the standalone FutBot API game services."""
 
 import os
 import tempfile
@@ -14,14 +14,27 @@ class FutBotServiceTests(unittest.TestCase):
         os.environ["FUTBOT_DB_PATH"] = os.path.join(self.temp_dir.name, "test.db")
         init_database()
         with transaction() as db:
-            db.execute("INSERT INTO cards (card_id, name, attack, defense, speed, overall, card_type, card_rarity, copies) VALUES (1, 'Test Icon', 90, 90, 90, 92, 'Icon', 'Icon', 0)")
+            db.execute("INSERT INTO cards (card_id, name, attack, defense, speed, overall, card_type, card_rarity, copies) VALUES (1, 'Test Icon', 95, 90, 90, 92, 'Icon', 'Icon', 0)")
             db.execute("INSERT INTO cards (card_id, name, attack, defense, speed, overall, card_type, card_rarity, copies) VALUES (2, 'Test Hero', 88, 85, 80, 88, 'Hero', 'Hero', 0)")
             db.execute("INSERT INTO cards (card_id, name, attack, defense, speed, overall, card_type, card_rarity, copies) VALUES (3, 'Test Standard', 87, 86, 84, 87, 'Standard', 'Rare', 0)")
+            for card_id in range(10, 16):
+                db.execute("INSERT INTO cards (card_id, name, overall, card_type, card_rarity, copies) VALUES (?, ?, 75, 'Standard', 'Common', 0)", (card_id, f"Common {card_id}"))
+            for card_id in range(20, 23):
+                db.execute("INSERT INTO cards (card_id, name, overall, card_type, card_rarity, copies) VALUES (?, ?, 82, 'Standard', 'Uncommon', 0)", (card_id, f"Uncommon {card_id}"))
+            db.execute("INSERT INTO cards (card_id, name, overall, card_type, card_rarity, copies) VALUES (30, 'Rare Starter', 86, 'Standard', 'Rare', 0)")
         services.ensure_player(123, "Test User")
+        services.ensure_player(456, "Opponent")
 
     def tearDown(self):
         self.temp_dir.cleanup()
         os.environ.pop("FUTBOT_DB_PATH", None)
+
+    def add_owned_card(self, user_id, card_id, edition=1):
+        with transaction() as db:
+            db.execute(
+                "INSERT INTO inventories (user_id, card_id, edition, trade_count) VALUES (?, ?, ?, 0)",
+                (user_id, card_id, edition),
+            )
 
     def test_catalog_and_player(self):
         self.assertEqual(services.get_card(1)["name"], "Test Icon")
@@ -31,9 +44,17 @@ class FutBotServiceTests(unittest.TestCase):
         with self.assertRaises(services.GameError):
             services.buy_pack(123, 1)
 
-    def test_inventory_sell_updates_balance(self):
+    def test_pack_purchase_and_open(self):
         with transaction() as db:
-            db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (123, 3, 1)")
+            db.execute("UPDATE players SET coins = 3000 WHERE user_id = 123")
+        services.buy_pack(123, 2)
+        result = services.open_pack(123, 2)
+        self.assertEqual(len(result["cards"]), 1)
+        self.assertEqual(result["cards"][0]["card_type"], "Icon")
+        self.assertEqual(len(services.get_inventory(123)), 1)
+
+    def test_inventory_sell_updates_balance(self):
+        self.add_owned_card(123, 3)
         result = services.sell_cards(123, [3])
         self.assertEqual(result["coins_earned"], services.card_value(87))
         self.assertEqual(result["balance"], services.card_value(87))
@@ -46,6 +67,73 @@ class FutBotServiceTests(unittest.TestCase):
     def test_deck_requires_five_owned_cards(self):
         with self.assertRaises(services.GameError):
             services.save_deck(123, "Main", [1, 2, 3, 4, 5])
+
+    def test_starter_pack(self):
+        result = services.claim_starter_pack(123)
+        self.assertEqual(result["count"], 10)
+        with self.assertRaises(services.GameError):
+            services.claim_starter_pack(123)
+
+    def test_daily_reward_and_collection(self):
+        reward = services.claim_daily(123)
+        self.assertEqual(len(reward["choices"]), 2)
+        collected = services.collect_daily(123, reward["choices"][0]["card_id"])
+        self.assertEqual(collected["card"]["card_id"], reward["choices"][0]["card_id"])
+
+    def test_simple_trade(self):
+        self.add_owned_card(123, 1)
+        self.add_owned_card(456, 2)
+        offer = services.create_trade_offer(123, 456, 1, 2)
+        resolved = services.resolve_trade_offer(offer["trade_id"], 456, True)
+        self.assertEqual(resolved["status"], "accepted")
+        self.assertEqual([c["card_id"] for c in services.get_inventory(123)], [2])
+        self.assertEqual([c["card_id"] for c in services.get_inventory(456)], [1])
+
+    def test_advanced_exchange(self):
+        self.add_owned_card(123, 1)
+        self.add_owned_card(456, 2)
+        with transaction() as db:
+            db.execute("UPDATE players SET coins = 100 WHERE user_id IN (123, 456)")
+        exchange = services.create_exchange(123, 456)
+        session_id = exchange["session_id"]
+        services.update_exchange_offer(session_id, 123, [1], 20)
+        services.update_exchange_offer(session_id, 456, [2], 10)
+        services.lock_exchange(session_id, 123)
+        services.lock_exchange(session_id, 456)
+        services.confirm_exchange(session_id, 123)
+        result = services.confirm_exchange(session_id, 456)
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(services.get_player(123)["coins"], 90)
+        self.assertEqual(services.get_player(456)["coins"], 110)
+
+    def test_battle_round(self):
+        for card_id in range(1, 6):
+            self.add_owned_card(123, card_id)
+        for card_id in range(10, 15):
+            self.add_owned_card(456, card_id)
+        services.save_deck(123, "A", [1, 2, 3, 4, 5])
+        services.save_deck(456, "B", [10, 11, 12, 13, 14])
+        battle = services.create_battle(123, 456)
+        battle_id = battle["battle_id"]
+        services.accept_battle(battle_id, 456)
+        services.select_battle_deck(battle_id, 123, "A")
+        services.select_battle_deck(battle_id, 456, "B")
+        services.choose_battle_action(battle_id, 123, "attack")
+        services.choose_battle_card(battle_id, 123, 1)
+        result = services.choose_battle_card(battle_id, 456, 10)
+        self.assertEqual(result["state"]["phase"], "RESULT")
+        self.assertEqual(result["state"]["p1_wins"], 1)
+
+    def test_market_escrow_and_purchase(self):
+        self.add_owned_card(123, 1)
+        with transaction() as db:
+            db.execute("UPDATE players SET coins = 1000 WHERE user_id = 456")
+        listing = services.create_market_listing(123, 1, 1, 250, 1)
+        self.assertEqual(services.get_inventory(123), [])
+        purchased = services.buy_market_listing(listing["listing_id"], 456)
+        self.assertEqual(purchased["buyer_id"], 456)
+        self.assertEqual(services.get_player(456)["coins"], 750)
+        self.assertEqual(services.get_player(123)["coins"], 250)
 
 
 if __name__ == "__main__":
