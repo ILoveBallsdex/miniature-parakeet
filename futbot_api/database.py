@@ -101,6 +101,11 @@ def init_database() -> None:
             tester_pack INTEGER DEFAULT 0,
             FOREIGN KEY(user_id) REFERENCES players(user_id)
         )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS pending_daily_rewards (
+            user_id INTEGER PRIMARY KEY, card_ids TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES players(user_id)
+        )""")
         db.execute("""CREATE TABLE IF NOT EXISTS market_listings (
             listing_id INTEGER PRIMARY KEY AUTOINCREMENT, seller_id INTEGER,
             card_id INTEGER, edition INTEGER DEFAULT 1, trade_count INTEGER DEFAULT 0,
@@ -128,7 +133,8 @@ def init_database() -> None:
         _add_columns(db, "players", {
             "coins": "INTEGER DEFAULT 0", "cards_dropped": "INTEGER DEFAULT 0",
             "cards_sold": "INTEGER DEFAULT 0", "display_title": "TEXT DEFAULT NULL",
-            "battles_drawn": "INTEGER DEFAULT 0", "daily_streak": "INTEGER DEFAULT 0",
+            "battles_drawn": "INTEGER DEFAULT 0", "rounds_drawn": "INTEGER DEFAULT 0",
+            "daily_streak": "INTEGER DEFAULT 0",
             "last_daily_claim": "TEXT DEFAULT NULL", "itscominghome": "INTEGER DEFAULT 0",
             "jogabonito": "INTEGER DEFAULT 0", "pineappleonpizza": "INTEGER DEFAULT 0",
             "mannschaft": "INTEGER DEFAULT 0", "theflyingdutchmen": "INTEGER DEFAULT 0",
