@@ -410,6 +410,49 @@ async def battle_surrender(request):
     return success(services.surrender_battle(request.match_info["battle_id"], user_id))
 
 
+def require_admin(admin_id: int):
+    configured = os.getenv("FUTBOT_ADMIN_IDS", os.getenv("ADMIN_IDS", ""))
+    admin_ids = {int(value.strip()) for value in configured.split(",") if value.strip().isdigit()}
+    if admin_id not in admin_ids:
+        raise services.GameError("You are not authorized to use this admin action.", 403)
+
+
+async def admin_give_coins(request):
+    payload = await read_json(request)
+    try:
+        admin_id = int(payload["admin_id"])
+        user_id = int(payload["user_id"])
+        amount = int(payload["amount"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("admin_id, user_id and amount are required integers.")
+    require_admin(admin_id)
+    return success(services.admin_give_coins(user_id, amount))
+
+
+async def admin_give_card(request):
+    payload = await read_json(request)
+    try:
+        admin_id = int(payload["admin_id"])
+        user_id = int(payload["user_id"])
+        card_id = int(payload["card_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("admin_id, user_id and card_id are required integers.")
+    require_admin(admin_id)
+    return success(services.admin_give_card(user_id, card_id))
+
+
+async def admin_remove_card(request):
+    payload = await read_json(request)
+    try:
+        admin_id = int(payload["admin_id"])
+        user_id = int(payload["user_id"])
+        card_id = int(payload["card_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("admin_id, user_id and card_id are required integers.")
+    require_admin(admin_id)
+    return success(services.admin_remove_card(user_id, card_id))
+
+
 async def secret_reward(request):
     user_id = int(request.match_info["user_id"])
     secret_name = request.match_info["secret"]
@@ -663,6 +706,9 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/battles/{battle_id}/next", battle_next_round)
     app.router.add_post("/api/v1/battles/{battle_id}/draw", battle_draw)
     app.router.add_post("/api/v1/battles/{battle_id}/surrender", battle_surrender)
+    app.router.add_post("/api/v1/admin/coins", admin_give_coins)
+    app.router.add_post("/api/v1/admin/cards/give", admin_give_card)
+    app.router.add_post("/api/v1/admin/cards/remove", admin_remove_card)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/secrets/{secret}", secret_reward)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/trade-up/{tier}", trade_up_eligible)
     app.router.add_post("/api/v1/trade-up", trade_up_execute)
