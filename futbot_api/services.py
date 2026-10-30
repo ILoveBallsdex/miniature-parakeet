@@ -507,6 +507,28 @@ def choose_battle_action(battle_id: str, user_id: int, action: str):
     return _battle_payload(row)
 
 
+
+
+
+def _unlock_stat_achievements(db, user_id: int, stat_type: str):
+    thresholds = {
+        "rounds_won": {10: 1, 50: 2, 100: 8},
+        "battles_won": {1: 3, 10: 4, 25: 5, 50: 6, 100: 8},
+    }
+    if stat_type not in thresholds:
+        return
+    row = db.execute(f"SELECT {stat_type} FROM players WHERE user_id = ?", (user_id,)).fetchone()
+    if row is None:
+        return
+    value = int(row[stat_type] or 0)
+    for threshold, achievement_id in thresholds[stat_type].items():
+        if value >= threshold:
+            db.execute(
+                "INSERT OR IGNORE INTO user_achievements (user_id, achievement_id) VALUES (?, ?)",
+                (user_id, achievement_id),
+            )
+
+
 def _resolve_battle_round(db, row, state):
     p1_id, p2_id = row["player1_id"], row["player2_id"]
     p1_card = db.execute("SELECT * FROM cards WHERE card_id = ?", (state["p1_card"],)).fetchone()
@@ -554,6 +576,7 @@ def _resolve_battle_round(db, row, state):
         winner_card_id = p1_card["card_id"] if winner_id == p1_id else p2_card["card_id"]
         db.execute("UPDATE players SET rounds_won = rounds_won + 1 WHERE user_id = ?", (winner_id,))
         db.execute("UPDATE players SET rounds_lost = rounds_lost + 1 WHERE user_id = ?", (loser_id,))
+        _unlock_stat_achievements(db, winner_id, "rounds_won")
         db.execute("UPDATE inventories SET rounds_won = rounds_won + 1 WHERE user_id = ? AND card_id = ?", (winner_id, winner_card_id))
         db.execute("UPDATE cards SET total_rounds_won = COALESCE(total_rounds_won, 0) + 1 WHERE card_id = ?", (winner_card_id,))
     else:
@@ -586,6 +609,7 @@ def _finish_battle(db, row, state, winner_id=None, draw=False, surrendered_by=No
         loser_id = p2_id if winner_id == p1_id else p1_id
         db.execute("UPDATE players SET battles_won = battles_won + 1, coins = COALESCE(coins, 0) + 200 WHERE user_id = ?", (winner_id,))
         db.execute("UPDATE players SET battles_lost = battles_lost + 1, coins = COALESCE(coins, 0) + 100 WHERE user_id = ?", (loser_id,))
+        _unlock_stat_achievements(db, winner_id, "battles_won")
     if not surrendered_by:
         for uid, deck_key in ((p1_id, "p1_deck"), (p2_id, "p2_deck")):
             won = not draw and uid == winner_id
