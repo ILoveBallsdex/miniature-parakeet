@@ -93,6 +93,7 @@ async def status(request):
             "starter_pack": True,
             "card_drops": True,
             "secret_rewards": True,
+            "admin_management": True,
             "leaderboards": True,
             "battles": True,
             "trading": True,
