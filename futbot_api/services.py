@@ -736,12 +736,12 @@ FORMATIONS = {
  "2-3-2 (CAM)":["GK","CB","CB","CM","CAM","CM","ST","ST"],
  "2-3-2 (3 CM)":["GK","CB","CB","CM","CM","CM","ST","ST"],
  "2-4-1":["GK","CB","CB","CM","CDM","CM","CAM","ST"],
- "3-2-2":["GK","LB","CB","RB","CM","CM","ST","CF"],
+ "3-2-2":["GK","LB","CB","RB","CM","CM","ST","ST"],
  "3-3-1 (CDM)":["GK","LB","CB","RB","CM","CDM","CM","ST"],
  "3-3-1 (CAM)":["GK","LB","CB","RB","CM","CAM","CM","ST"],
  "3-3-1 (3 CM)":["GK","LB","CB","RB","CM","CM","CM","ST"],
  "4-2-1":["GK","LB","CB","CB","RB","CM","CM","ST"],
- "4-1-2":["GK","LB","CB","CB","RB","CM","ST","CF"],
+ "4-1-2":["GK","LB","CB","CB","RB","CM","ST","ST"],
 }
 POSITION_AREAS={"GK":"gk","CB":"def","LB":"def","RB":"def","CDM":"mid","CM":"mid","CAM":"mid","LW":"att","RW":"att","ST":"att","CF":"att"}
 POSITION_EQUIVALENTS={"CB":"CB","LCB":"CB","RCB":"CB","LWB":"CB","RWB":"CB","LB":"LB","RB":"RB","LM":"CM","RM":"CM","CM":"CM","CDM":"CDM","CAM":"CAM","ST":"ST","CF":"ST"}
