@@ -2309,3 +2309,5 @@ def get_card_weight(search: str):
                 raise GameError("The non-standard card catalog is empty.", 409)
             value = 3 / total
     return {"card_id": card["card_id"], "name": card["name"], "weight": value}
+
+# Deployment check: harmless comment to trigger the Railway API redeploy.
