@@ -76,6 +76,11 @@ def init_database() -> None:
             FOREIGN KEY(user_id) REFERENCES players(user_id),
             FOREIGN KEY(card_id) REFERENCES cards(card_id)
         )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS lineups (
+            user_id INTEGER PRIMARY KEY, formation TEXT NOT NULL DEFAULT '2-2-3',
+            slots TEXT NOT NULL DEFAULT '{}',
+            FOREIGN KEY(user_id) REFERENCES players(user_id)
+        )""")
         db.execute("""CREATE TABLE IF NOT EXISTS decks (
             user_id INTEGER, deck_name TEXT, cards TEXT,
             FOREIGN KEY(user_id) REFERENCES players(user_id)
