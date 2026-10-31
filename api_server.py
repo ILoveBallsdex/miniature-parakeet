@@ -109,13 +109,24 @@ async def status(request):
 
 async def card_list(request):
     search = request.query.get("search", "").strip()[:100]
+    tier = request.query.get("tier", "").strip().lower() or None
+    position = request.query.get("position", "").strip().upper() or None
     try:
         limit = int(request.query.get("limit", "50"))
         offset = int(request.query.get("offset", "0"))
     except ValueError:
         raise services.GameError("limit and offset must be integers.")
-    cards = services.search_cards(search, limit, offset)
-    return success({"cards": cards, "count": len(cards), "limit": max(1, min(limit, 100)), "offset": max(0, offset)})
+    result = services.search_card_catalog(search, limit, offset, tier, position)
+    cards = result["cards"]
+    return success({
+        "cards": cards,
+        "count": len(cards),
+        "total": result["total"],
+        "limit": max(1, min(limit, 100)),
+        "offset": max(0, offset),
+        "tier": tier,
+        "position": position,
+    })
 
 
 async def card_lookup(request):
