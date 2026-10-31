@@ -63,6 +63,18 @@ class FutBotServiceTests(unittest.TestCase):
         self.assertEqual(result["balance"], services.card_value(87))
         self.assertEqual(services.get_inventory(123), [])
 
+    def test_player_values_scale_with_overall_and_quicksell_is_half(self):
+        self.assertEqual(services.card_value(60), 1000)
+        self.assertEqual(services.quicksell_value(60), 500)
+        values = [services.card_value(overall) for overall in range(60, 100)]
+        self.assertEqual(values, sorted(values))
+        self.assertGreater(services.card_value(90), services.card_value(80) * 2)
+
+        self.add_owned_card(123, 1)
+        result = services.quicksell_card(123, 1)
+        self.assertEqual(result["coins_earned"], services.card_value(92) // 2)
+        self.assertEqual(services.get_player(123)["coins"], services.card_value(92) // 2)
+
     def test_wishlist_toggle(self):
         self.assertTrue(services.toggle_wishlist(123, 1)["wishlisted"])
         self.assertFalse(services.toggle_wishlist(123, 1)["wishlisted"])
