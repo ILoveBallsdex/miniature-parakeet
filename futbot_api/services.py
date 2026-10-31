@@ -615,7 +615,7 @@ def _grant_random_reward(user_id: int, amount: int, cooldown_column: str, cooldo
         balance = db.execute("SELECT coins FROM players WHERE user_id = ?", (user_id,)).fetchone()["coins"]
 
     return {
-        "cards": [dict(card) for card in selected],
+        "cards": [{**dict(card), "quicksell_value": quicksell_value(card["overall"] or 0)} for card in selected],
         "cards_received": len(selected),
         "coins_earned": coins,
         "balance": balance,
