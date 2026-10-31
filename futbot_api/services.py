@@ -518,6 +518,86 @@ def _weighted_choice(weighted):
     return random.choices([item[0] for item in weighted], weights=[item[1] for item in weighted], k=1)[0]
 
 
+
+def _grant_random_reward(user_id: int, amount: int, cooldown_column: str, cooldown_seconds: int, coins: int = 0):
+    """Grant weighted random cards and optional coins, enforcing cooldown atomically."""
+    if cooldown_column not in ("last_daily_reward_claim", "last_quick_claim"):
+        raise GameError("Invalid reward cooldown.")
+    now = datetime.now()
+    with transaction() as db:
+        player = db.execute(
+            f"SELECT coins, {cooldown_column} AS last_claim FROM players WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        if player is None:
+            raise GameError("Player not found. Create the player first.", 404)
+
+        last_claim = player["last_claim"]
+        if last_claim:
+            try:
+                last_time = datetime.fromisoformat(last_claim)
+            except (TypeError, ValueError):
+                last_time = None
+            if last_time is not None:
+                elapsed = (now - last_time).total_seconds()
+                if elapsed < cooldown_seconds:
+                    remaining = int(cooldown_seconds - elapsed)
+                    minutes, seconds = divmod(remaining, 60)
+                    hours, minutes = divmod(minutes, 60)
+                    if hours:
+                        wait = f"{hours}h {minutes}m"
+                    elif minutes:
+                        wait = f"{minutes}m {seconds}s"
+                    else:
+                        wait = f"{seconds}s"
+                    raise GameError(f"You can claim this reward again in {wait}.", 409)
+
+        weighted = _weighted_card_rows(db)
+        selected = []
+        excluded = set()
+        for _ in range(amount):
+            card = _weighted_choice([item for item in weighted if item[0]["card_id"] not in excluded])
+            if card is None:
+                raise GameError(f"The card catalog needs at least {amount} eligible different cards for this reward.", 409)
+            selected.append(card)
+            excluded.add(card["card_id"])
+
+        for card in selected:
+            edition_row = db.execute(
+                "SELECT COALESCE(copies, 0) + 1 AS edition FROM cards WHERE card_id = ?",
+                (card["card_id"],),
+            ).fetchone()
+            edition = int(edition_row["edition"])
+            db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card["card_id"],))
+            db.execute(
+                "INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)",
+                (user_id, card["card_id"], edition),
+            )
+
+        db.execute(
+            f"UPDATE players SET {cooldown_column} = ?, coins = COALESCE(coins, 0) + ?, cards_dropped = COALESCE(cards_dropped, 0) + ? WHERE user_id = ?",
+            (now.isoformat(), coins, len(selected), user_id),
+        )
+        balance = db.execute("SELECT coins FROM players WHERE user_id = ?", (user_id,)).fetchone()["coins"]
+
+    return {
+        "cards": [dict(card) for card in selected],
+        "cards_received": len(selected),
+        "coins_earned": coins,
+        "balance": balance,
+        "next_claim": (now + timedelta(seconds=cooldown_seconds)).isoformat(),
+    }
+
+
+def claim_daily_reward(user_id: int):
+    return _grant_random_reward(user_id, 3, "last_daily_reward_claim", 24 * 60 * 60, coins=1000)
+
+
+def claim_quick_reward(user_id: int):
+    return _grant_random_reward(user_id, 1, "last_quick_claim", 30 * 60)
+
+
+
 def claim_daily(user_id: int):
     today = datetime.now().date()
     now = datetime.now()
