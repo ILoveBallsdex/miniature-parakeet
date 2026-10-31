@@ -156,9 +156,9 @@ async def player_lineup_image(request):
 
     # Arrange the saved formation as a vertical football pitch:
     # attackers at the top, then midfield, defenders, and the goalkeeper.
-    card_width, card_height = 210, 294
-    label_height = 126
-    gap_x, padding_x = 24, 40
+    card_width, card_height = 420, 588
+    label_height = 430
+    gap_x, padding_x = 48, 80
     row_gap, top_padding = 48, 92
     row_order = ("att", "mid", "def", "gk")
     position_rows = {
@@ -192,9 +192,9 @@ async def player_lineup_image(request):
     draw = ImageDraw.Draw(canvas)
 
     try:
-        position_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 48)
-        name_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 32)
-        small_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 28)
+        position_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 200)
+        name_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 64)
+        small_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 56)
         badge_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 25)
         title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 34)
     except OSError:
@@ -264,14 +264,14 @@ async def player_lineup_image(request):
             name_box = draw.textbbox((0, 0), name_label, font=name_font)
             rating_box = draw.textbbox((0, 0), rating_label, font=small_font)
             draw.text((label_center_x - (position_box[2] - position_box[0]) // 2,
-                       y + card_height + 2), position_label,
+                       y + card_height + 8), position_label,
                       font=position_font, fill=(255, 255, 255),
                       stroke_width=1, stroke_fill=(20, 45, 30))
             draw.text((label_center_x - (name_box[2] - name_box[0]) // 2,
-                       y + card_height + 61), name_label,
+                       y + card_height + 230), name_label,
                       font=name_font, fill=(255, 255, 255))
             draw.text((label_center_x - (rating_box[2] - rating_box[0]) // 2,
-                       y + card_height + 99), rating_label,
+                       y + card_height + 320), rating_label,
                       font=small_font, fill=(235, 245, 235))
 
     output = BytesIO()
