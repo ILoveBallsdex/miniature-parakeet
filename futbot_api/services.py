@@ -64,34 +64,38 @@ CARD_INTEGER_FIELDS = {"attack", "defense", "speed", "shooting", "passing", "dri
 
 
 def calculate_overall(position: str, shooting=0, passing=0, dribbling=0, defense=0, goalkeeping=0) -> int:
-    """Calculate OVR using the stats that matter most for each position."""
+    """Calculate OVR using the simple position-group formulas."""
     position = str(position or "").upper()
     if position == "GK":
-        return max(1, min(99, round(float(goalkeeping or 0))))
+        return int(round(float(goalkeeping or 0)))
 
-    # Outfield stat order: SHO, PAS, DRI, DEF.
-    # Attackers are judged on attacking output; defenders on defending.
-    weights = {
-        "ST": (0.60, 0.15, 0.25, 0.00),
-        "CF": (0.45, 0.30, 0.25, 0.00),
-        "LW": (0.45, 0.15, 0.40, 0.00),
-        "RW": (0.45, 0.15, 0.40, 0.00),
-        "CAM": (0.30, 0.40, 0.30, 0.00),
-        "CM": (0.15, 0.40, 0.25, 0.20),
-        "CDM": (0.00, 0.25, 0.10, 0.65),
-        "LM": (0.30, 0.25, 0.40, 0.05),
-        "RM": (0.30, 0.25, 0.40, 0.05),
-        "LB": (0.00, 0.20, 0.00, 0.80),
-        "RB": (0.00, 0.20, 0.00, 0.80),
-        "LWB": (0.00, 0.25, 0.05, 0.70),
-        "RWB": (0.00, 0.25, 0.05, 0.70),
-        "CB": (0.00, 0.15, 0.00, 0.85),
-        "LCB": (0.00, 0.15, 0.00, 0.85),
-        "RCB": (0.00, 0.15, 0.00, 0.85),
-    }
-    weights_for_position = weights.get(position, (0.20, 0.30, 0.20, 0.30))
-    stats = (shooting, passing, dribbling, defense)
-    return max(1, min(99, round(sum(float(value or 0) * weight for value, weight in zip(stats, weights_for_position)))))
+    total = sum(float(value or 0) for value in (shooting, dribbling, passing, defense))
+    attackers = {"ST", "CF", "LW", "RW"}
+    midfielders = {"CAM", "CM", "CDM", "LM", "RM"}
+    defenders = {"LB", "RB", "LWB", "RWB", "CB", "LCB", "RCB"}
+
+    if position in attackers:
+        return int(round(total / 3))
+    if position in defenders:
+        import math
+        return int(math.ceil(total / 2.5))
+    # Midfielders and any unlisted outfield position use the midfield formula.
+    return int(round(total / 4))
+
+
+def recalculate_catalog_overalls():
+    """Recalculate every existing card using the current position-group formula."""
+    with transaction() as db:
+        rows = db.execute(
+            "SELECT card_id, position, shooting, passing, dribbling, defense, goalkeeping FROM cards"
+        ).fetchall()
+        for row in rows:
+            overall = calculate_overall(
+                row["position"], row["shooting"], row["passing"],
+                row["dribbling"], row["defense"], row["goalkeeping"],
+            )
+            db.execute("UPDATE cards SET overall = ? WHERE card_id = ?", (overall, row["card_id"]))
+    return len(rows)
 
 
 def _clean_catalog_card(payload: dict, creating: bool):
