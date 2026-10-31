@@ -129,10 +129,14 @@ class FutBotServiceTests(unittest.TestCase):
     def test_formations_use_only_standard_defensive_slots(self):
         expected = {
             "2-2-3": ["GK", "CB", "CB", "CM", "CM", "LW", "ST", "RW"],
-            "2-3-2": ["GK", "CB", "CB", "CM", "CAM", "CM", "ST", "CF"],
-            "2-4-1": ["GK", "CB", "CB", "CM", "CM", "CDM", "CAM", "ST"],
+            "2-3-2 (CDM)": ["GK", "CB", "CB", "CM", "CDM", "CM", "ST", "ST"],
+            "2-3-2 (CAM)": ["GK", "CB", "CB", "CM", "CAM", "CM", "ST", "ST"],
+            "2-3-2 (3 CM)": ["GK", "CB", "CB", "CM", "CM", "CM", "ST", "ST"],
+            "2-4-1": ["GK", "CB", "CB", "CM", "CDM", "CM", "CAM", "ST"],
             "3-2-2": ["GK", "LB", "CB", "RB", "CM", "CM", "ST", "CF"],
-            "3-3-1": ["GK", "LB", "CB", "RB", "CM", "CM", "CAM", "ST"],
+            "3-3-1 (CDM)": ["GK", "LB", "CB", "RB", "CM", "CDM", "CM", "ST"],
+            "3-3-1 (CAM)": ["GK", "LB", "CB", "RB", "CM", "CAM", "CM", "ST"],
+            "3-3-1 (3 CM)": ["GK", "LB", "CB", "RB", "CM", "CM", "CM", "ST"],
             "4-2-1": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "ST"],
             "4-1-2": ["GK", "LB", "CB", "CB", "RB", "CM", "ST", "CF"],
         }
@@ -148,6 +152,11 @@ class FutBotServiceTests(unittest.TestCase):
             self.assertGreaterEqual(midfielders, 1, name)
             self.assertGreaterEqual(attackers, 1, name)
             self.assertFalse(set(positions) & {"LCB", "RCB", "LWB", "RWB", "LM", "RM"})
+
+        for name in ("2-3-2 (CDM)", "2-3-2 (CAM)", "2-3-2 (3 CM)"):
+            self.assertEqual(services.FORMATIONS[name].count("ST"), 2, name)
+        for name in ("3-3-1 (CDM)", "3-3-1 (CAM)", "3-3-1 (3 CM)"):
+            self.assertEqual(services.FORMATIONS[name].count("ST"), 1, name)
 
     def test_legacy_wide_and_center_back_positions_match_standard_slots(self):
         for old_position in ("LCB", "RCB", "LWB", "RWB"):
