@@ -305,15 +305,16 @@ async def player_lineup_image(request):
         # Keep the front three high. Drop the rest of the formation,
         # with the defensive line closer to the goalkeeper.
         if row_name == "mid":
-            row_y += 250
-        elif row_name == "def":
-            row_y += 750
-        elif row_name == "gk":
             row_y += 500
+        elif row_name == "def":
+            # Align the defensive line just above the goalkeeper.
+            row_y += 1800
+        elif row_name == "gk":
+            row_y += 400
         count = len(row)
         # Give the back line its own wider spacing so LB/CB/RB use more
         # of the available pitch width than the other rows.
-        row_gap_x = 1100 if row_name == "def" else gap_x
+        row_gap_x = 1300 if row_name == "def" else gap_x
         total_width = count * card_width + max(0, count - 1) * row_gap_x
         # Center each line of players on the pitch.
         start_x = (canvas_width - total_width) // 2 - 15
@@ -340,7 +341,7 @@ async def player_lineup_image(request):
             y = row_y
             if row_name == "gk":
                 # Offset the goalkeeper horizontally from the central CB.
-                x += 750
+                x += 450
             if row_name == "att" and position == "CF":
                 y += 250
 
@@ -357,7 +358,7 @@ async def player_lineup_image(request):
                     cm_index += 1
                 elif position in ("CAM", "CDM"):
                     x = canvas_width // 2 - card_width // 2
-                    y = row_y - 600 if position == "CAM" else row_y + 670
+                    y = row_y - 300 if position == "CAM" else row_y + 900
 
             card = slot.get("card")
             if card and card.get("image_path"):
