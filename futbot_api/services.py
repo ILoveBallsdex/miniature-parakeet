@@ -731,14 +731,14 @@ def save_deck(user_id: int, deck_name: str, card_ids: list[int]):
 
 
 FORMATIONS = {
- "2-2-3":["GK","LCB","RCB","CM","CM","LW","ST","RW"],
- "3-2-2":["GK","LCB","CB","RCB","CM","CM","ST","CF"],
- "2-3-2":["GK","LCB","RCB","CM","CM","CAM","ST","CF"],
- "4-2-1":["GK","LB","LCB","RCB","RB","CM","CM","ST"],
- "3-3-1":["GK","LCB","CB","RCB","CM","CM","CAM","ST"],
+ "2-2-3":["GK","CB","CB","CM","CM","LW","ST","RW"],
+ "3-2-2":["GK","CB","LB","RB","CM","CM","ST","CF"],
+ "2-3-2":["GK","CB","CB","CM","CM","CAM","ST","CF"],
+ "4-2-1":["GK","LB","CB","CB","RB","CM","CM","ST"],
+ "3-3-1":["GK","CB","LB","RB","CM","CM","CAM","ST"],
 }
-POSITION_AREAS={"GK":"gk","CB":"def","LCB":"def","RCB":"def","LB":"def","RB":"def","LWB":"def","RWB":"def","CDM":"mid","CM":"mid","CAM":"mid","LM":"mid","RM":"mid","LW":"att","RW":"att","ST":"att","CF":"att"}
-POSITION_EQUIVALENTS={"CB":"CB","LCB":"CB","RCB":"CB","ST":"ST","CF":"ST"}
+POSITION_AREAS={"GK":"gk","CB":"def","LB":"def","RB":"def","CDM":"mid","CM":"mid","CAM":"mid","LW":"att","RW":"att","ST":"att","CF":"att"}
+POSITION_EQUIVALENTS={"CB":"CB","LCB":"CB","RCB":"CB","LWB":"CB","RWB":"CB","LB":"LB","RB":"RB","LM":"CM","RM":"CM","CM":"CM","CDM":"CDM","CAM":"CAM","ST":"ST","CF":"ST"}
 
 def position_penalty(natural_position, slot_position):
  n=(natural_position or "").upper().strip(); p=(slot_position or "").upper().strip()
