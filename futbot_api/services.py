@@ -309,7 +309,7 @@ def open_pack(user_id: int, pack_id: int):
             db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, COALESCE((SELECT copies + 1 FROM cards WHERE card_id = ?), 1))", (user_id, card["card_id"], card["card_id"]))
             db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card["card_id"],))
         remaining = db.execute(f"SELECT {pack['name']} AS quantity FROM packs WHERE user_id = ?", (user_id,)).fetchone()["quantity"]
-    return {"pack_id": pack_id, "pack": pack["display_name"], "cards": [{**dict(card), "quicksell_value": quicksell_value(card["overall"] or 0)} for card in selected], "remaining": remaining}
+    return {"pack_id": pack_id, "pack": pack["display_name"], "cards": [{**dict(card), "value": card_value(card["overall"] or 0), "quicksell_value": quicksell_value(card["overall"] or 0)} for card in selected], "remaining": remaining}
 
 
 def sell_cards(user_id: int, card_ids: list[int]):
