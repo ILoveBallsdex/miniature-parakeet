@@ -193,14 +193,14 @@ async def player_lineup_image(request):
 
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        position_font = ImageFont.truetype(font_path, 50)
-        name_font = ImageFont.truetype(font_path, 80)
+        position_font = ImageFont.truetype(font_path, 125)
+        name_font = ImageFont.truetype(font_path, 100)
         small_font = ImageFont.truetype(font_path, 72)
         badge_font = ImageFont.truetype(font_path, 32)
         title_font = ImageFont.truetype(font_path, 42)
     except OSError:
-        position_font = ImageFont.load_default(size=50)
-        name_font = ImageFont.load_default(size=80)
+        position_font = ImageFont.load_default(size=125)
+        name_font = ImageFont.load_default(size=100)
         small_font = ImageFont.load_default(size=72)
         badge_font = ImageFont.load_default(size=32)
         title_font = ImageFont.load_default(size=42)
