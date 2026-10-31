@@ -157,7 +157,7 @@ async def player_lineup_image(request):
     # Arrange the saved formation as a vertical football pitch:
     # attackers at the top, then midfield, defenders, and the goalkeeper.
     card_width, card_height = 210, 294
-    label_height = 66
+    label_height = 92
     gap_x, padding_x = 24, 40
     row_gap, top_padding = 48, 92
     row_order = ("att", "mid", "def", "gk")
@@ -192,12 +192,13 @@ async def player_lineup_image(request):
     draw = ImageDraw.Draw(canvas)
 
     try:
-        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 20)
+        position_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 30)
+        name_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 18)
         small_font = ImageFont.truetype("DejaVuSans.ttf", 17)
         badge_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 25)
         title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 34)
     except OSError:
-        font = small_font = badge_font = title_font = ImageFont.load_default()
+        position_font = name_font = small_font = badge_font = title_font = ImageFont.load_default()
 
     # Pitch markings.
     draw.rectangle((14, 14, canvas_width - 14, canvas_height - 14), outline=(220, 242, 225), width=3)
@@ -249,18 +250,28 @@ async def player_lineup_image(request):
             else:
                 card = None
 
+            position_label = f"{slot['position']} ({slot['slot']})"
             if card:
-                name = str(card.get("name") or "Unknown")
-                rating = str(card.get("effective_overall", card.get("overall", "—")))
-                label = f"{slot['position']} · {name}"
-                rating_label = f"{rating} OVR"
+                name_label = str(card.get("name") or "Unknown")[:23]
+                rating_label = f"{card.get('effective_overall', card.get('overall', '—'))} OVR"
             else:
-                label = f"{slot['position']} · Empty"
+                name_label = "Empty"
                 rating_label = " "
-            # Keep long player names readable on the line below each card.
-            draw.text((x + 2, y + card_height + 5), label[:23],
-                      font=font, fill=(255, 255, 255), stroke_width=1, stroke_fill=(20, 45, 30))
-            draw.text((x + 2, y + card_height + 27), rating_label,
+
+            # Center each label beneath its card, with a small rightward adjustment.
+            label_center_x = x + card_width // 2 + 28
+            position_box = draw.textbbox((0, 0), position_label, font=position_font)
+            name_box = draw.textbbox((0, 0), name_label, font=name_font)
+            rating_box = draw.textbbox((0, 0), rating_label, font=small_font)
+            draw.text((label_center_x - (position_box[2] - position_box[0]) // 2,
+                       y + card_height + 3), position_label,
+                      font=position_font, fill=(255, 255, 255),
+                      stroke_width=1, stroke_fill=(20, 45, 30))
+            draw.text((label_center_x - (name_box[2] - name_box[0]) // 2,
+                       y + card_height + 39), name_label,
+                      font=name_font, fill=(255, 255, 255))
+            draw.text((label_center_x - (rating_box[2] - rating_box[0]) // 2,
+                       y + card_height + 63), rating_label,
                       font=small_font, fill=(235, 245, 235))
 
     output = BytesIO()
