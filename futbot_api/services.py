@@ -796,11 +796,12 @@ def set_lineup_formation(user_id,formation):
 
 
 def _weighted_card_rows(db, excluded_ids=()):
-    """Return cards weighted so each OVR tier gets its configured share."""
+    """Return cards weighted by reward-tier odds, shared evenly within each tier."""
     rows = db.execute("SELECT * FROM cards ORDER BY card_id").fetchall()
     excluded = set(excluded_ids)
     eligible = [card for card in rows if card["card_id"] not in excluded]
-    tiers = ((45, 64, 35), (65, 74, 30), (75, 79, 20), (80, 90, 10), (91, 99, 5))
+    # Lower-rated league players should be much more common.
+    tiers = ((45, 64, 45), (65, 74, 30), (75, 79, 18), (80, 85, 7))
     counts = {(low, high): sum(1 for card in eligible if low <= int(card["overall"] or 0) <= high) for low, high, _ in tiers}
     weighted = []
     for card in eligible:
