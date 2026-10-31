@@ -43,6 +43,12 @@ class FutBotServiceTests(unittest.TestCase):
         self.assertEqual(services.get_card(1)["name"], "Test Icon")
         self.assertEqual(services.get_player(123)["name"], "Test User")
 
+    def test_position_weighted_overall_uses_role_stats(self):
+        self.assertEqual(services.calculate_overall("GK", goalkeeping=83), 83)
+        self.assertEqual(services.calculate_overall("ST", shooting=100), 45)
+        self.assertEqual(services.calculate_overall("CB", shooting=100), 5)
+        self.assertEqual(services.calculate_overall("CB", defense=100), 70)
+
     def test_buy_pack_requires_balance(self):
         with self.assertRaises(services.GameError):
             services.buy_pack(123, 1)
