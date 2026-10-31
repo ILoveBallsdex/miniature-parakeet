@@ -409,15 +409,15 @@ CREATOR = "noobmaster"
 DESCRIPTION = "This bot is designed to give maximum resemblance to Match Attax card games. With this bot, you can collect football player cards and battle with your friends using your favourite players."
 # Sorted Newest to Oldest for better UX
 CHANGELOG_DATA = [
-    "1.7.1 - Leaderboards now have a Friends scope — toggle Server / Global / Friends to rank only among your friends.",
+    "1.7.1 - Leaderboards now have a Friends scope - toggle Server / Global / Friends to rank only among your friends.",
     "1.7.1 - Friend request notifications now fire reliably after prefix commands as well as slash commands.",
     "1.7.0 - Friends System: send/accept friend requests with /addfriend, /removefriend, /friends. Pending requests show on next command with accept/decline buttons.",
     "1.6.6 - Transfer market now keeps full history of all listings (sold, cancelled, expired) with status tracking.",
     "1.6.6 - Trade up reward card image now displays inside the embed instead of as a separate message.",
-    "1.6.6 - Trade up rare pool now uses weighted category selection — Rare Standard cards are far more common than Hero/Icon.",
+    "1.6.6 - Trade up rare pool now uses weighted category selection - Rare Standard cards are far more common than Hero/Icon.",
     "1.6.5 - Trade Up: sacrifice 5 cards of a rarity for 1 of the next tier via /tradeup.",
     "1.6.4 - Transfer Market: list, browse, buy, and unlist cards with /list, /market, /listed, /unlist.",
-    "1.6.4 - Fixed edition numbering — copies no longer double-increments when a card is given or dropped.",
+    "1.6.4 - Fixed edition numbering - copies no longer double-increments when a card is given or dropped.",
     "1.6.3 - Duplicate cards: players can now hold multiple copies of the same card, each with its own edition number.",
     "1.6.2 - /view and /lookup now show all owned editions for duplicate cards. /lookup shows an edition picker when you own multiple copies.",
     "1.6.1 - Unique-type cards are now hidden from /view and autocomplete for players who don't own them.",
@@ -1391,9 +1391,9 @@ class ViewCardSelect(discord.ui.Select):
             edition_list = ', '.join(f'#{r[0]}' for r in user_copies)
             if len(user_copies) == 1:
                 ownership = "First Owner" if user_copies[0][1] == 0 else "Traded In"
-                inv_value = f"✅ 1 copy — Edition {edition_list} ({ownership})"
+                inv_value = f"✅ 1 copy - Edition {edition_list} ({ownership})"
             else:
-                inv_value = f"✅ {len(user_copies)} copies — Editions: {edition_list}"
+                inv_value = f"✅ {len(user_copies)} copies - Editions: {edition_list}"
             embed.add_field(name="Your Inventory", value=inv_value, inline=True)
 
         embed.set_footer(text=f"Requested by {self.user.name}", icon_url=self.user.display_avatar.url)
@@ -1618,9 +1618,9 @@ async def view(ctx, *, player_name: str):
                 edition_list = ', '.join(f'#{r[0]}' for r in user_copies)
                 if len(user_copies) == 1:
                     ownership = "First Owner" if user_copies[0][1] == 0 else "Traded In"
-                    inv_value = f"✅ 1 copy — Edition {edition_list} ({ownership})"
+                    inv_value = f"✅ 1 copy - Edition {edition_list} ({ownership})"
                 else:
-                    inv_value = f"✅ {len(user_copies)} copies — Editions: {edition_list}"
+                    inv_value = f"✅ {len(user_copies)} copies - Editions: {edition_list}"
                 embed.add_field(name="Your Inventory", value=inv_value, inline=True)
 
             embed.set_footer(text=f"Requested by {ctx.author.name}", icon_url=ctx.author.display_avatar.url)
@@ -1870,11 +1870,11 @@ async def lookup(ctx, card: str, user: discord.User = None):
     if not results:
         return await ctx.send(f"❌ **{target_user.name}** does not own Card ID `{card_id_int}`.")
 
-    # 4a. Multiple copies — show edition picker
+    # 4a. Multiple copies - show edition picker
     if len(results) > 1:
         view = LookupEditionView(results, target_user, card_id_int)
         embed = discord.Embed(
-            title=f"📋 Multiple Editions — {results[0][0]}",
+            title=f"📋 Multiple Editions - {results[0][0]}",
             description=f"**{target_user.name}** owns **{len(results)} copies**. Select an edition to inspect.",
             color=discord.Color.gold()
         )
@@ -1882,7 +1882,7 @@ async def lookup(ctx, card: str, user: discord.User = None):
         view.message = msg
         return
 
-    # 4b. Single copy — generate slab directly
+    # 4b. Single copy - generate slab directly
     name, overall, atk, def_, spd, rarity, type_, image_path, total_copies, edition, b_played, b_won, r_played, r_won = results[0]
     
     edition_str = f"#{edition}/{total_copies}"
@@ -4368,7 +4368,7 @@ class MultiSellView(discord.ui.View):
                     val = calculate_card_value(card)
                     total_value += val
                     # Format: "Messi (94) • 150c"
-                    item_list.append(f"• **{card.name}** ({card.overall}) — {val:,} coins")
+                    item_list.append(f"• **{card.name}** ({card.overall}) - {val:,} coins")
             
             # Show last 10 items
             display_str = "\n".join(item_list[-10:])
@@ -5604,7 +5604,7 @@ class FriendRequestView(discord.ui.View):
 
 
 class FriendsListView(discord.ui.View):
-    """Shown alongside /friends — has a 'View Pending Requests' button if any exist."""
+    """Shown alongside /friends - has a 'View Pending Requests' button if any exist."""
     def __init__(self, user, pending_count):
         super().__init__(timeout=120)
         self.user = user
@@ -5638,7 +5638,7 @@ class FriendsListView(discord.ui.View):
             color=discord.Color.gold()
         )
         if len(requests) > 1:
-            embed.set_footer(text=f"{len(requests) - 1} more pending after this — accept or decline to see the next.")
+            embed.set_footer(text=f"{len(requests) - 1} more pending after this - accept or decline to see the next.")
         view = FriendRequestView(request_id, requester_id, self.user.id, name or '')
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
@@ -5670,7 +5670,7 @@ async def addfriend(ctx, user: discord.User):
         _add_friendship(ctx.author.id, user.id)
         cursor.execute('DELETE FROM friend_requests WHERE request_id=?', (incoming[0],))
         conn.commit()
-        return await ctx.send(f"🤝 **{user.name}** had already requested you — you're now friends!")
+        return await ctx.send(f"🤝 **{user.name}** had already requested you - you're now friends!")
 
     cursor.execute('INSERT INTO friend_requests (requester_id, recipient_id) VALUES (?, ?)',
                    (ctx.author.id, user.id))
@@ -5755,7 +5755,7 @@ async def _send_pending_friend_notification(author, send_func):
             color=discord.Color.gold()
         )
         if more > 0:
-            embed.set_footer(text=f"You have {more} other pending request(s) — use /friends to view them.")
+            embed.set_footer(text=f"You have {more} other pending request(s) - use /friends to view them.")
         view = FriendRequestView(request_id, requester_id, author.id, name or '')
         await send_func(content=author.mention, embed=embed, view=view)
     except Exception as e:
@@ -5910,7 +5910,7 @@ class TradeUpConfirmView(discord.ui.View):
         conn.close()
 
         filename = f"card_{result_card_id}.png"
-        embed = discord.Embed(title=f"✨ Trade Up Complete! — {name}", color=discord.Color.purple())
+        embed = discord.Embed(title=f"✨ Trade Up Complete! - {name}", color=discord.Color.purple())
         embed.set_author(name=f"Rewarded to {self.user.name}", icon_url=self.user.display_avatar.url)
         embed.add_field(name="Info", value=f"🆔 {result_card_id}\n💎 {rarity}\n🏆 {card_type}", inline=True)
         embed.add_field(name="Base Stats", value=f"⭐ **{overall}** | ⚔️ {atk} | 🛡️ {def_} | ⚡ {spd}", inline=True)
@@ -6020,7 +6020,7 @@ class MarketDurationSelect(discord.ui.Select):
             if isinstance(item, MarketConfirmButton):
                 item.disabled = False
         embed = discord.Embed(title="📋 Confirm Listing", color=discord.Color.gold())
-        embed.add_field(name="Card", value=f"**{self.view.card.name}** — Edition #{self.view.edition}", inline=True)
+        embed.add_field(name="Card", value=f"**{self.view.card.name}** - Edition #{self.view.edition}", inline=True)
         embed.add_field(name="Price", value=f"💰 {self.view.price:,} coins", inline=True)
         embed.add_field(name="Duration", value=f"⏱ {self.values[0]}", inline=True)
         embed.set_footer(text="Card is held in escrow until sold or expired.")
@@ -6099,7 +6099,7 @@ class MarketListingView(discord.ui.View):
 
 
 class MarketEditionSelect(discord.ui.Select):
-    """Shown when user owns multiple copies — lets them pick which one to list."""
+    """Shown when user owns multiple copies - lets them pick which one to list."""
     def __init__(self, copies, card, price, seller):
         self.card = card
         self.price = price
@@ -6128,7 +6128,7 @@ class MarketEditionSelect(discord.ui.Select):
         edition, trade_count = row
         view = MarketListingView(self.seller, self.card, edition, trade_count, self.price)
         embed = discord.Embed(
-            title=f"📋 List {self.card.name} — Edition #{edition}",
+            title=f"📋 List {self.card.name} - Edition #{edition}",
             description=f"Price: **{self.price:,} coins**\nSelect a duration below.",
             color=discord.Color.gold()
         )
@@ -6165,7 +6165,7 @@ async def list_card(ctx, card: str, price: int):
         edition, trade_count, _ = copies[0]
         view = MarketListingView(ctx.author, card_obj, edition, trade_count, price)
         embed = discord.Embed(
-            title=f"📋 List {card_obj.name} — Edition #{edition}",
+            title=f"📋 List {card_obj.name} - Edition #{edition}",
             description=f"Price: **{price:,} coins**\nSelect a duration below.",
             color=discord.Color.gold()
         )
@@ -6636,10 +6636,10 @@ async def api_table_delete(request):
 
 async def _start_dashboard_api():
     if not _AIOHTTP_AVAILABLE:
-        logger.warning('aiohttp not installed — dashboard API disabled')
+        logger.warning('aiohttp not installed - dashboard API disabled')
         return
     if not DASHBOARD_SECRET:
-        logger.warning('DASHBOARD_SECRET not set — dashboard API disabled')
+        logger.warning('DASHBOARD_SECRET not set - dashboard API disabled')
         return
 
     app = aiohttp_web.Application()
