@@ -734,10 +734,8 @@ FORMATIONS = {
  "2-2-3":["GK","CB","CB","CM","CM","LW","ST","RW"],
  "2-3-2":["GK","CB","CB","CM","CAM","CM","ST","CF"],
  "2-4-1":["GK","CB","CB","CM","CM","CDM","CAM","ST"],
- "2-1-4":["GK","CB","CB","CM","LW","ST","CF","RW"],
  "3-2-2":["GK","LB","CB","RB","CM","CM","ST","CF"],
  "3-3-1":["GK","LB","CB","RB","CM","CM","CAM","ST"],
- "3-1-3":["GK","LB","CB","RB","CM","LW","ST","RW"],
  "4-2-1":["GK","LB","CB","CB","RB","CM","CM","ST"],
  "4-1-2":["GK","LB","CB","CB","RB","CM","ST","CF"],
 }
