@@ -64,21 +64,32 @@ CARD_INTEGER_FIELDS = {"attack", "defense", "speed", "shooting", "passing", "dri
 
 
 def calculate_overall(position: str, shooting=0, passing=0, dribbling=0, defense=0, goalkeeping=0) -> int:
-    """Calculate OVR with weights that change based on the player's position."""
+    """Calculate OVR using the stats that matter most for each position."""
     position = str(position or "").upper()
     if position == "GK":
         return max(1, min(99, round(float(goalkeeping or 0))))
+
+    # Outfield stat order: SHO, PAS, DRI, DEF.
+    # Attackers are judged on attacking output; defenders on defending.
     weights = {
-        "ST": (0.45, 0.15, 0.30, 0.10), "CF": (0.35, 0.30, 0.25, 0.10),
-        "LW": (0.30, 0.20, 0.35, 0.15), "RW": (0.30, 0.20, 0.35, 0.15),
-        "CAM": (0.25, 0.35, 0.30, 0.10), "CM": (0.15, 0.35, 0.25, 0.25),
-        "CDM": (0.10, 0.30, 0.20, 0.40), "LM": (0.20, 0.25, 0.35, 0.20),
-        "RM": (0.20, 0.25, 0.35, 0.20), "LB": (0.05, 0.15, 0.15, 0.65),
-        "LWB": (0.05, 0.20, 0.25, 0.50), "CB": (0.05, 0.15, 0.10, 0.70),
-        "LCB": (0.05, 0.15, 0.10, 0.70), "RCB": (0.05, 0.15, 0.10, 0.70),
-        "RB": (0.05, 0.15, 0.15, 0.65), "RWB": (0.05, 0.20, 0.25, 0.50),
+        "ST": (0.60, 0.15, 0.25, 0.00),
+        "CF": (0.45, 0.30, 0.25, 0.00),
+        "LW": (0.45, 0.15, 0.40, 0.00),
+        "RW": (0.45, 0.15, 0.40, 0.00),
+        "CAM": (0.30, 0.40, 0.30, 0.00),
+        "CM": (0.15, 0.40, 0.25, 0.20),
+        "CDM": (0.00, 0.25, 0.10, 0.65),
+        "LM": (0.30, 0.25, 0.40, 0.05),
+        "RM": (0.30, 0.25, 0.40, 0.05),
+        "LB": (0.00, 0.20, 0.00, 0.80),
+        "RB": (0.00, 0.20, 0.00, 0.80),
+        "LWB": (0.00, 0.25, 0.05, 0.70),
+        "RWB": (0.00, 0.25, 0.05, 0.70),
+        "CB": (0.00, 0.15, 0.00, 0.85),
+        "LCB": (0.00, 0.15, 0.00, 0.85),
+        "RCB": (0.00, 0.15, 0.00, 0.85),
     }
-    weights_for_position = weights.get(position, (0.20, 0.25, 0.25, 0.30))
+    weights_for_position = weights.get(position, (0.20, 0.30, 0.20, 0.30))
     stats = (shooting, passing, dribbling, defense)
     return max(1, min(99, round(sum(float(value or 0) * weight for value, weight in zip(stats, weights_for_position)))))
 
