@@ -221,6 +221,40 @@ async def card_image(request):
     return web.FileResponse(resolve_asset_path(card.get("image_path")))
 
 
+async def card_compare_image(request):
+    raw_ids = request.query.get("ids", "")
+    try:
+        card_ids = [int(value.strip()) for value in raw_ids.split(",") if value.strip()]
+    except ValueError:
+        raise services.GameError("ids must be comma-separated card IDs.")
+    if len(card_ids) != 2 or card_ids[0] == card_ids[1]:
+        raise services.GameError("Provide exactly two different card IDs.")
+    from io import BytesIO
+    from PIL import Image
+    cards = [services.get_card(card_id) for card_id in card_ids]
+    if any(card is None for card in cards):
+        raise services.GameError("One or both cards were not found.", 404)
+    images = []
+    for card in cards:
+        try:
+            with Image.open(resolve_asset_path(card.get("image_path"))) as source:
+                images.append(source.convert("RGB").copy())
+        except services.GameError:
+            raise
+        except Exception as exc:
+            raise services.GameError("A card image could not be opened.", 404) from exc
+    target_width, target_height, gap = 600, 840, 16
+    canvas = Image.new("RGB", (target_width * 2 + gap, target_height), (22, 25, 35))
+    for index, image in enumerate(images):
+        image.thumbnail((target_width, target_height), Image.Resampling.LANCZOS)
+        x = index * (target_width + gap) + (target_width - image.width) // 2
+        y = (target_height - image.height) // 2
+        canvas.paste(image, (x, y))
+    output = BytesIO()
+    canvas.save(output, format="PNG", optimize=True)
+    return web.Response(body=output.getvalue(), content_type="image/png")
+
+
 async def card_weight(request):
     search = request.query.get("search", "")
     return success(services.get_card_weight(search))
@@ -940,6 +974,7 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_get("/health", health)
     app.router.add_get("/api/v1/status", status)
     app.router.add_get("/api/v1/cards", card_list)
+    app.router.add_get("/api/v1/cards/compare-image", card_compare_image)
     app.router.add_get("/api/v1/cards/weight", card_weight)
     app.router.add_get("/api/v1/cards/{card_id:\\d+}", card_detail)
     app.router.add_get("/api/v1/cards/{card_id:\\d+}/image", card_image)
