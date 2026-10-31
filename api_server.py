@@ -229,13 +229,15 @@ async def player_lineup_image(request):
     # Keep the same near-2:3 portrait ratio Discord displayed larger before, with larger cards.
     card_width, card_height = 625, 1094
     label_height = 200
-    gap_x, padding_x = 169, 75
+    gap_x, padding_x = 250, 75
     row_gap, top_padding = 0, 200
-    row_order = ("att", "cam", "mid", "cdm", "def", "gk")
+    # Keep all midfield roles on one line so the back line and goalkeeper
+    # remain visible inside the fixed-height canvas.
+    row_order = ("att", "mid", "def", "gk")
     position_rows = {
         "GK": "gk",
         "LB": "def", "CB": "def", "RB": "def",
-        "CDM": "cdm", "CM": "mid", "CAM": "cam",
+        "CDM": "mid", "CM": "mid", "CAM": "mid",
         "LW": "att", "ST": "att", "CF": "att", "RW": "att",
     }
     rows = {name: [] for name in row_order}
