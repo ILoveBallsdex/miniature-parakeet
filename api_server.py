@@ -154,55 +154,116 @@ async def player_lineup_image(request):
     from io import BytesIO
     from PIL import Image, ImageDraw, ImageFont
 
-    card_width, card_height = 300, 420
-    gap, padding, label_height = 18, 24, 38
-    columns, rows = 4, 2
-    canvas_width = padding * 2 + columns * card_width + (columns - 1) * gap
-    canvas_height = padding * 2 + rows * (card_height + label_height) + (rows - 1) * gap
-    canvas = Image.new("RGB", (canvas_width, canvas_height), (24, 27, 35))
+    # Arrange the saved formation as a vertical football pitch:
+    # attackers at the top, then midfield, defenders, and the goalkeeper.
+    card_width, card_height = 176, 246
+    label_height = 52
+    gap_x, padding_x = 24, 34
+    row_gap, top_padding = 54, 82
+    row_order = ("att", "mid", "def", "gk")
+    position_rows = {
+        "GK": "gk",
+        "LB": "def", "LCB": "def", "CB": "def", "RCB": "def", "RB": "def",
+        "LWB": "def", "RWB": "def",
+        "CDM": "mid", "CM": "mid", "CAM": "mid", "LM": "mid", "RM": "mid",
+        "LW": "att", "ST": "att", "CF": "att", "RW": "att",
+    }
+    left_to_right = {
+        "LB": 0, "LWB": 1, "LCB": 2, "CB": 3, "RCB": 4, "RWB": 5, "RB": 6,
+        "LM": 0, "CDM": 1, "CM": 2, "CAM": 3, "RM": 4,
+        "LW": 0, "ST": 1, "CF": 2, "RW": 3,
+        "GK": 0,
+    }
+    rows = {name: [] for name in row_order}
+    for slot in lineup["slots"]:
+        position = str(slot.get("position") or "").upper()
+        row_name = position_rows.get(position, "mid")
+        rows[row_name].append(slot)
+    for row_name in row_order:
+        rows[row_name].sort(
+            key=lambda item: (left_to_right.get(str(item.get("position") or "").upper(), 99), int(item["slot"]))
+        )
+
+    max_players = max(1, *(len(row) for row in rows.values()))
+    canvas_width = max(900, padding_x * 2 + max_players * card_width + (max_players - 1) * gap_x)
+    row_height = card_height + label_height
+    canvas_height = top_padding + len(row_order) * row_height + (len(row_order) - 1) * row_gap + 38
+    canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
     draw = ImageDraw.Draw(canvas)
+
     try:
-        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 18)
-        badge_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 24)
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 15)
+        small_font = ImageFont.truetype("DejaVuSans.ttf", 13)
+        badge_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 22)
+        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 30)
     except OSError:
-        font = ImageFont.load_default()
-        badge_font = ImageFont.load_default()
+        font = small_font = badge_font = title_font = ImageFont.load_default()
 
-    for index, slot in enumerate(lineup["slots"]):
-        col, row = index % columns, index // columns
-        x = padding + col * (card_width + gap)
-        y = padding + row * (card_height + label_height + gap)
-        card = slot.get("card")
-        if card and card.get("image_path"):
-            try:
-                with Image.open(resolve_asset_path(card["image_path"])) as source:
-                    artwork = source.convert("RGB")
-                artwork.thumbnail((card_width, card_height), Image.Resampling.LANCZOS)
-                card_image = Image.new("RGB", (card_width, card_height), (38, 41, 50))
-                card_image.paste(artwork, ((card_width - artwork.width) // 2, (card_height - artwork.height) // 2))
-                canvas.paste(card_image, (x, y))
-                penalty = int(card.get("position_penalty") or 0)
-                if penalty > 0:
-                    badge_text = f"-{penalty}"
-                    bounds = draw.textbbox((0, 0), badge_text, font=badge_font)
-                    badge_w = bounds[2] - bounds[0] + 24
-                    badge_h = bounds[3] - bounds[1] + 18
-                    bx, by = x + card_width - badge_w - 8, y + 8
-                    draw.rounded_rectangle((bx, by, bx + badge_w, by + badge_h), radius=10, fill=(210, 35, 45), outline=(255, 255, 255), width=2)
-                    draw.text((bx + 12, by + 7), badge_text, font=badge_font, fill=(255, 255, 255))
-            except services.GameError:
-                card = None
-            except Exception:
+    # Pitch markings.
+    draw.rectangle((14, 14, canvas_width - 14, canvas_height - 14), outline=(220, 242, 225), width=3)
+    draw.line((14, canvas_height // 2, canvas_width - 14, canvas_height // 2), fill=(220, 242, 225), width=2)
+    draw.ellipse((canvas_width // 2 - 75, canvas_height // 2 - 75,
+                  canvas_width // 2 + 75, canvas_height // 2 + 75), outline=(220, 242, 225), width=2)
+    draw.rectangle((canvas_width // 2 - 180, 14, canvas_width // 2 + 180, 115),
+                   outline=(220, 242, 225), width=2)
+    draw.rectangle((canvas_width // 2 - 180, canvas_height - 115,
+                    canvas_width // 2 + 180, canvas_height - 14), outline=(220, 242, 225), width=2)
+    title = f"{lineup.get('formation', '2-2-3')} FORMATION"
+    title_box = draw.textbbox((0, 0), title, font=title_font)
+    draw.text(((canvas_width - (title_box[2] - title_box[0])) // 2, 30),
+              title, font=title_font, fill=(255, 255, 255))
+
+    for row_index, row_name in enumerate(row_order):
+        row = rows[row_name]
+        y = top_padding + row_index * (row_height + row_gap)
+        count = len(row)
+        total_width = count * card_width + max(0, count - 1) * gap_x
+        start_x = (canvas_width - total_width) // 2 if count else canvas_width // 2
+        for index, slot in enumerate(row):
+            x = start_x + index * (card_width + gap_x)
+            card = slot.get("card")
+            if card and card.get("image_path"):
+                try:
+                    with Image.open(resolve_asset_path(card["image_path"])) as source:
+                        artwork = source.convert("RGB")
+                    artwork.thumbnail((card_width, card_height), Image.Resampling.LANCZOS)
+                    card_image = Image.new("RGB", (card_width, card_height), (38, 41, 50))
+                    card_image.paste(artwork, ((card_width - artwork.width) // 2,
+                                               (card_height - artwork.height) // 2))
+                    canvas.paste(card_image, (x, y))
+                    penalty = int(card.get("position_penalty") or 0)
+                    if penalty > 0:
+                        badge_text = f"-{penalty}"
+                        bounds = draw.textbbox((0, 0), badge_text, font=badge_font)
+                        badge_w = bounds[2] - bounds[0] + 20
+                        badge_h = bounds[3] - bounds[1] + 14
+                        bx, by = x + card_width - badge_w - 6, y + 6
+                        draw.rounded_rectangle((bx, by, bx + badge_w, by + badge_h),
+                                               radius=9, fill=(210, 35, 45),
+                                               outline=(255, 255, 255), width=2)
+                        draw.text((bx + 10, by + 5), badge_text,
+                                  font=badge_font, fill=(255, 255, 255))
+                except Exception:
+                    card = None
+            else:
                 card = None
 
-        if card:
-            label = f"Slot {slot['slot']} · {slot['position']}  |  {card['name']} · {card['effective_overall']} OVR"
-        else:
-            label = f"Slot {slot['slot']} · {slot['position']}  |  Empty"
-        draw.text((x, y + card_height + 8), label[:48], font=font, fill=(240, 240, 245))
+            if card:
+                name = str(card.get("name") or "Unknown")
+                rating = str(card.get("effective_overall", card.get("overall", "—")))
+                label = f"{slot['position']} · {name}"
+                rating_label = f"{rating} OVR"
+            else:
+                label = f"{slot['position']} · Empty"
+                rating_label = " "
+            # Keep long player names readable on the line below each card.
+            draw.text((x + 2, y + card_height + 5), label[:23],
+                      font=font, fill=(255, 255, 255), stroke_width=1, stroke_fill=(20, 45, 30))
+            draw.text((x + 2, y + card_height + 27), rating_label,
+                      font=small_font, fill=(235, 245, 235))
 
     output = BytesIO()
-    canvas.save(output, format="PNG")
+    canvas.save(output, format="PNG", optimize=True)
     return web.Response(body=output.getvalue(), content_type="image/png")
 
 
