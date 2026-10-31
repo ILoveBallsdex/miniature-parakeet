@@ -75,6 +75,12 @@ class FutBotServiceTests(unittest.TestCase):
         self.assertEqual(result["coins_earned"], services.card_value(92) // 2)
         self.assertEqual(services.get_player(123)["coins"], services.card_value(92) // 2)
 
+    def test_quick_reward_includes_quicksell_preview_value(self):
+        reward = services.claim_quick_reward(123)
+        self.assertEqual(len(reward["cards"]), 1)
+        card = reward["cards"][0]
+        self.assertEqual(card["quicksell_value"], services.quicksell_value(card["overall"]))
+
     def test_wishlist_toggle(self):
         self.assertTrue(services.toggle_wishlist(123, 1)["wishlisted"])
         self.assertFalse(services.toggle_wishlist(123, 1)["wishlisted"])
