@@ -124,11 +124,16 @@ def _clean_catalog_card(payload: dict, creating: bool):
     if "dribbling" not in result and "speed" in result:
         result["dribbling"] = result["speed"]
     if "passing" not in result:
-        result["passing"] = round((result.get("shooting", 0) + result.get("defense", 0)) / 2)
+        if "attack" in result:
+            result["passing"] = round((result.get("shooting", 0) + result.get("defense", 0)) / 2)
+        elif creating:
+            raise GameError("Outfield players require the passing stat.")
+        else:
+            result["passing"] = 0
     position = str(result.get("position", payload.get("position", ""))).upper()
     if position == "GK":
         if "goalkeeping" not in result:
-            if "defense" in result:
+            if "attack" in result and "defense" in result:
                 result["goalkeeping"] = result["defense"]  # Legacy imports only.
             elif creating:
                 raise GameError("Goalkeepers require the goalkeeping stat.")
