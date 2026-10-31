@@ -118,6 +118,34 @@ async def card_list(request):
     return success({"cards": cards, "count": len(cards), "limit": max(1, min(limit, 100)), "offset": max(0, offset)})
 
 
+async def card_lookup(request):
+    name = request.query.get("name", "").strip()[:100]
+    if not name:
+        raise services.GameError("Enter a player name.")
+    return success(services.find_catalog_card(name))
+
+
+async def buy_player_card(request):
+    user_id = int(request.match_info["user_id"])
+    payload = await read_json(request)
+    try:
+        card_id = int(payload["card_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("card_id must be an integer.")
+    return success(services.buy_player_card(user_id, card_id))
+
+
+async def owned_card_lookup(request):
+    user_id = int(request.match_info["user_id"])
+    name = request.query.get("name", "").strip()[:100]
+    if not name:
+        raise services.GameError("Enter a player name.")
+    card = services.find_owned_card(user_id, name)
+    card["value"] = services.card_value(card["overall"] or 0)
+    card["quicksell_value"] = services.quicksell_value(card["overall"] or 0)
+    return success(card)
+
+
 async def card_detail(request):
     card_id = int(request.match_info["card_id"])
     card = services.get_card(card_id)
@@ -1112,6 +1140,7 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_get("/health", health)
     app.router.add_get("/api/v1/status", status)
     app.router.add_get("/api/v1/cards", card_list)
+    app.router.add_get("/api/v1/cards/lookup", card_lookup)
     app.router.add_get("/api/v1/cards/compare-image", card_compare_image)
     app.router.add_get("/api/v1/cards/weight", card_weight)
     app.router.add_get("/api/v1/cards/{card_id:\\d+}", card_detail)
@@ -1128,6 +1157,8 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/friends/requests/{request_id:\\d+}/{decision:accept|decline}", friend_request_resolve)
     app.router.add_post("/api/v1/friends/remove", friend_remove)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/inventory", player_inventory)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/cards/lookup", owned_card_lookup)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/cards/buy", buy_player_card)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/cards/{card_id:\\d+}/copies", owned_card_copies)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/cards/{card_id:\\d+}/minted", minted_card_image)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/packs", player_packs)
