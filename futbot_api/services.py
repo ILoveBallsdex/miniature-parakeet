@@ -626,11 +626,11 @@ def _grant_random_reward(user_id: int, amount: int, cooldown_column: str, cooldo
 
 
 def claim_daily_reward(user_id: int):
-    return _grant_random_reward(user_id, 3, "last_daily_reward_claim", 24 * 60 * 60, coins=1000)
+    return _grant_random_reward(user_id, 3, "last_daily_reward_claim", 0, coins=1000)
 
 
 def claim_quick_reward(user_id: int):
-    return _grant_random_reward(user_id, 1, "last_quick_claim", 30 * 60)
+    return _grant_random_reward(user_id, 1, "last_quick_claim", 0)
 
 
 
