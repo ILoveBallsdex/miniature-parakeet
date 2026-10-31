@@ -698,7 +698,7 @@ def decline_battle(battle_id: str, user_id: int):
     return _battle_payload(row)
 
 
-def select_battle_deck(battle_id: str, user_id: int, deck_name: str):
+def select_battle_lineup(battle_id: str, user_id: int):
     from datetime import datetime
     with transaction() as db:
         row = _battle_row(db, battle_id)
@@ -708,24 +708,52 @@ def select_battle_deck(battle_id: str, user_id: int, deck_name: str):
             raise GameError("You are not part of this battle.", 403)
         state = json.loads(row["state_json"])
         if state["phase"] != "SETUP":
-            raise GameError("Deck selection is already complete.", 409)
-        deck = db.execute("SELECT cards FROM decks WHERE user_id = ? AND deck_name = ?", (user_id, deck_name)).fetchone()
-        if deck is None:
-            raise GameError("Deck not found.", 404)
-        card_ids = [int(value) for value in (deck["cards"] or "").split(",") if value.strip().isdigit()]
-        if len(card_ids) != 5 or len(set(card_ids)) != 5:
-            raise GameError("Battle decks must contain exactly 5 different cards.", 409)
-        owned = db.execute(
-            f"SELECT COUNT(DISTINCT card_id) AS n FROM inventories WHERE user_id = ? AND card_id IN ({','.join('?' for _ in card_ids)})",
-            (user_id, *card_ids),
-        ).fetchone()["n"]
-        if owned != 5:
-            raise GameError("The selected deck contains cards the player no longer owns.", 409)
-        key = "p1_deck" if user_id == row["player1_id"] else "p2_deck"
-        state[key] = card_ids
+            raise GameError("Lineup selection is already complete.", 409)
+
+        lineup_row = db.execute(
+            "SELECT formation, slots FROM lineups WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if lineup_row is None:
+            raise GameError("You don't have a lineup yet. Fill all 8 slots with /8 add first.", 409)
+        formation = lineup_row["formation"]
+        assigned = json.loads(lineup_row["slots"] or "{}")
+        if len(assigned) != 8 or any(str(slot) not in assigned for slot in range(1, 9)):
+            raise GameError("Your lineup must have all 8 slots filled before battling.", 409)
+
+        lineup_snapshot = []
+        card_ids = []
+        for slot_number, position in enumerate(FORMATIONS[formation], 1):
+            card_id = int(assigned[str(slot_number)])
+            card_row = db.execute(
+                "SELECT c.* FROM cards c JOIN inventories i ON i.card_id = c.card_id "
+                "WHERE i.user_id = ? AND c.card_id = ?",
+                (user_id, card_id),
+            ).fetchone()
+            if card_row is None:
+                raise GameError("A player in your lineup is no longer owned. Update your lineup before battling.", 409)
+            card = dict(card_row)
+            penalty = position_penalty(card.get("position"), position)
+            card.update({
+                "slot": slot_number,
+                "slot_position": position,
+                "position_penalty": penalty,
+                "effective_overall": max(0, int(card.get("overall") or 0) - penalty),
+            })
+            lineup_snapshot.append({"slot": slot_number, "position": position, "card": card})
+            card_ids.append(card_id)
+
+        prefix = "p1" if user_id == row["player1_id"] else "p2"
+        state[prefix + "_deck"] = card_ids
+        state[prefix + "_lineup"] = {
+            "formation": formation,
+            "slots": lineup_snapshot,
+        }
         if state["p1_deck"] and state["p2_deck"]:
             state["phase"] = "ACTION"
-        db.execute("UPDATE battles SET state_json = ?, updated_at = ? WHERE battle_id = ?", (json.dumps(state), datetime.utcnow().isoformat(), battle_id))
+        db.execute(
+            "UPDATE battles SET state_json = ?, updated_at = ? WHERE battle_id = ?",
+            (json.dumps(state), datetime.utcnow().isoformat(), battle_id),
+        )
         row = _battle_row(db, battle_id)
     return _battle_payload(row)
 
@@ -892,7 +920,7 @@ def choose_battle_card(battle_id: str, user_id: int, card_id: int):
         used_key = "p1_used" if user_id == row["player1_id"] else "p2_used"
         card_key = "p1_card" if user_id == row["player1_id"] else "p2_card"
         if card_id not in state[deck_key] or card_id in state[used_key]:
-            raise GameError("Choose an unused card from your selected battle deck.", 403)
+            raise GameError("Choose an unused card from your saved eight-player lineup.", 403)
         if state[card_key] is not None:
             raise GameError("You have already selected a card this round.", 409)
         if not db.execute("SELECT 1 FROM inventories WHERE user_id = ? AND card_id = ?", (user_id, card_id)).fetchone():
