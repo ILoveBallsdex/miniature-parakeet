@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Inventories — FutBot Dashboard{% endblock %}
+{% block title %}Inventories - FutBot Dashboard{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
@@ -80,18 +80,18 @@
     <tbody>
       {% for row in rows %}
       <tr>
-        <td class="fw-semibold">{{ row['player_name'] or '—' }}</td>
+        <td class="fw-semibold">{{ row['player_name'] or '-' }}</td>
         <td class="text-muted small font-monospace">{{ row['user_id'] }}</td>
         <td>{{ row['card_name'] or row['card_id'] }}</td>
         <td>
           {% if row['overall'] %}
             <span class="badge ovr-badge ovr-{{ row['overall'] // 10 * 10 }}">{{ row['overall'] }}</span>
-          {% else %}—{% endif %}
+          {% else %}-{% endif %}
         </td>
         <td>
           {% if row['card_rarity'] %}
             <span class="rarity-badge rarity-{{ row['card_rarity'] | replace(' ', '-') | lower }}">{{ row['card_rarity'] }}</span>
-          {% else %}—{% endif %}
+          {% else %}-{% endif %}
         </td>
         <td class="text-muted small">{{ row['edition'] }}</td>
         <td>
