@@ -382,7 +382,7 @@ async def player_lineup_image(request):
             else:
                 card = None
 
-            position_label = str(slot["position"]).upper()
+            position_label = f'{str(slot["position"]).upper()} ({slot["slot"]})'
             # The card artwork already contains the player's name and overall.
             # Keep only the position label underneath each card.
             label_center_x = x + card_width // 2
