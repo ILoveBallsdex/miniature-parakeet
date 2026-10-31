@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}User Achievements — FutBot Dashboard{% endblock %}
+{% block title %}User Achievements - FutBot Dashboard{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
@@ -10,7 +10,7 @@
 
 {% if table_missing %}
   <div class="alert alert-danger">
-    Table <code>user_achievements</code> does not exist yet — run the bot once to create it.
+    Table <code>user_achievements</code> does not exist yet - run the bot once to create it.
   </div>
 {% else %}
 
@@ -45,10 +45,10 @@
     <tbody>
       {% for row in rows %}
       <tr>
-        <td class="fw-semibold">{{ row['player_name'] or '—' }}</td>
+        <td class="fw-semibold">{{ row['player_name'] or '-' }}</td>
         <td class="text-muted small font-monospace">{{ row['user_id'] }}</td>
         <td>{{ row['ach_title'] or row['achievement_id'] }}</td>
-        <td class="text-muted small">{{ row['date_earned'] or '—' }}</td>
+        <td class="text-muted small">{{ row['date_earned'] or '-' }}</td>
         <td>
           <form method="post"
                 action="{{ url_for('delete_user_achievement', rowid=row['rowid']) }}"
