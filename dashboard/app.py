@@ -188,7 +188,7 @@ def cards():
             rarities=RARITIES, clubs=clubs, nations=nations, leagues=leagues,
             total=len(rows))
 
-    # — Local mode —
+    # - Local mode -
     order_sql = 'DESC' if order == 'desc' else 'ASC'
     query  = 'SELECT * FROM cards WHERE 1=1'
     params = []
@@ -241,7 +241,7 @@ def add_card():
             flash(f'API error: {e}', 'error')
             return redirect(url_for('cards'))
 
-    # — Local mode —
+    # - Local mode -
     conn       = get_db()
     card_types = get_card_types(conn)
     if request.method == 'POST':
@@ -302,7 +302,7 @@ def edit_card(card_id):
             flash(f'API error: {e}', 'error')
             return redirect(url_for('cards'))
 
-    # — Local mode —
+    # - Local mode -
     conn       = get_db()
     card_types = get_card_types(conn)
     if request.method == 'POST':
@@ -352,7 +352,7 @@ def delete_card(card_id):
             flash(f'API error: {e}', 'error')
         return redirect(url_for('cards'))
 
-    # — Local mode —
+    # - Local mode -
     conn = get_db()
     row  = conn.execute('SELECT name FROM cards WHERE card_id = ?', (card_id,)).fetchone()
     if row:
@@ -398,7 +398,7 @@ def players():
         return render_template('players.html', players=rows, cols=cols,
                                search=search, sort=sort, order=order, total=len(rows))
 
-    # — Local mode —
+    # - Local mode -
     order_sql = 'DESC' if order == 'desc' else 'ASC'
     conn = get_db()
     cols = [r['name'] for r in conn.execute('PRAGMA table_info(players)').fetchall()]
@@ -444,7 +444,7 @@ def edit_player(user_id):
             flash(f'API error: {e}', 'error')
             return redirect(url_for('players'))
 
-    # — Local mode —
+    # - Local mode -
     conn = get_db()
     cols = [r['name'] for r in conn.execute('PRAGMA table_info(players)').fetchall()]
     if request.method == 'POST':
@@ -516,7 +516,7 @@ def inventories():
                                user_filter=user_filter, card_filter=card_filter,
                                all_cards=all_cards, all_players=all_players)
 
-    # — Local mode —
+    # - Local mode -
     query = '''
         SELECT i.rowid, i.user_id, p.name AS player_name,
                i.card_id, c.name AS card_name, c.overall, c.card_rarity, i.edition
@@ -568,7 +568,7 @@ def add_inventory():
             flash(f'API error: {e}', 'error')
         return redirect(url_for('inventories'))
 
-    # — Local mode —
+    # - Local mode -
     conn     = get_db()
     card_row = conn.execute('SELECT name, copies FROM cards WHERE card_id = ?', (int(card_id),)).fetchone()
     copies   = card_row['copies'] if card_row else 0
@@ -632,7 +632,7 @@ def decks():
         return render_template('decks.html', decks=enriched, user_filter=user_filter,
                                total=len(enriched))
 
-    # — Local mode —
+    # - Local mode -
     query = '''
         SELECT d.rowid, d.user_id, p.name AS player_name,
                d.deck_name, d.cards
@@ -717,7 +717,7 @@ def wishlists():
         return render_template('wishlists.html', rows=enriched,
                                user_filter=user_filter, total=len(enriched), table_missing=False)
 
-    # — Local mode —
+    # - Local mode -
     conn = get_db()
     if not table_exists(conn, 'wishlists'):
         conn.close()
@@ -762,7 +762,7 @@ def delete_wishlist(rowid):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PACKS  (table: packs — one row per player, one column per pack type)
+# PACKS  (table: packs - one row per player, one column per pack type)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @app.route('/packs')
@@ -797,7 +797,7 @@ def packs():
                                total=len(enriched), pack_cols=pack_cols,
                                all_players=all_players, table_missing=False)
 
-    # — Local mode —
+    # - Local mode -
     conn = get_db()
     if not table_exists(conn, 'packs'):
         conn.close()
@@ -850,7 +850,7 @@ def edit_pack(user_id, col):
             flash(f'API error: {e}', 'error')
         return redirect(url_for('packs'))
 
-    # — Local mode —
+    # - Local mode -
     conn = get_db()
     valid_cols = get_pack_cols(conn)
     if col not in valid_cols:
@@ -921,7 +921,7 @@ def give_pack():
             flash(f'API error: {e}', 'error')
         return redirect(url_for('packs'))
 
-    # — Local mode —
+    # - Local mode -
     conn       = get_db()
     valid_cols = get_pack_cols(conn)
     if pack_col not in valid_cols:
@@ -962,7 +962,7 @@ def achievements():
             rows = []
         return render_template('achievements.html', rows=rows, total=len(rows), table_missing=False)
 
-    # — Local mode —
+    # - Local mode -
     conn = get_db()
     if not table_exists(conn, 'achievements'):
         conn.close()
@@ -1020,7 +1020,7 @@ def edit_achievement(achievement_id):
             flash(f'API error: {e}', 'error')
             return redirect(url_for('achievements'))
 
-    # — Local mode —
+    # - Local mode -
     conn = get_db()
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
@@ -1062,7 +1062,7 @@ def delete_achievement(achievement_id):
             flash(f'API error: {e}', 'error')
         return redirect(url_for('achievements'))
 
-    # — Local mode —
+    # - Local mode -
     conn = get_db()
     row = conn.execute('SELECT title FROM achievements WHERE achievement_id = ?',
                        (achievement_id,)).fetchone()
@@ -1112,7 +1112,7 @@ def user_achievements():
         return render_template('user_achievements.html', rows=enriched,
                                user_filter=user_filter, total=len(enriched), table_missing=False)
 
-    # — Local mode —
+    # - Local mode -
     conn = get_db()
     if not table_exists(conn, 'user_achievements'):
         conn.close()
@@ -1201,7 +1201,7 @@ def market_listings():
                 r['card_rarity'] = card.get('card_rarity', '')
                 r['seller_name'] = plyr.get('name', '')
                 r['buyer_name']  = buyer.get('name', '') if r.get('buyer_id') else ''
-                r['time_left']   = _market_time_left(r.get('expires_at', '')) if r.get('status') == 'active' else '—'
+                r['time_left']   = _market_time_left(r.get('expires_at', '')) if r.get('status') == 'active' else '-'
                 enriched.append(r)
             if status_filter != 'all':
                 enriched = [r for r in enriched if r.get('status') == status_filter]
@@ -1216,7 +1216,7 @@ def market_listings():
         return render_template('market_listings.html', rows=enriched, search=search,
                                status_filter=status_filter, total=len(enriched), table_missing=False)
 
-    # — Local mode —
+    # - Local mode -
     conn = get_db()
     if not table_exists(conn, 'market_listings'):
         conn.close()
@@ -1250,7 +1250,7 @@ def market_listings():
     enriched = []
     for row in rows:
         r = dict(row)
-        r['time_left'] = _market_time_left(r.get('expires_at', '')) if r.get('status') == 'active' else '—'
+        r['time_left'] = _market_time_left(r.get('expires_at', '')) if r.get('status') == 'active' else '-'
         enriched.append(r)
 
     return render_template('market_listings.html', rows=enriched, search=search,
@@ -1267,7 +1267,7 @@ def delete_market_listing(listing_id):
             flash(f'API error: {e}', 'error')
         return redirect(url_for('market_listings'))
 
-    # — Local mode — hard delete (admin action)
+    # - Local mode - hard delete (admin action)
     conn = get_db()
     row = conn.execute(
         'SELECT seller_id, card_id, edition, trade_count, status FROM market_listings WHERE listing_id = ?', (listing_id,)
@@ -1278,7 +1278,7 @@ def delete_market_listing(listing_id):
                 'INSERT INTO inventories (user_id, card_id, edition, trade_count) VALUES (?, ?, ?, ?)',
                 (row['seller_id'], row['card_id'], row['edition'], row['trade_count'])
             )
-            flash('Listing removed — card returned to seller\'s inventory.', 'success')
+            flash('Listing removed - card returned to seller\'s inventory.', 'success')
         else:
             flash('Listing record deleted.', 'success')
         conn.execute('DELETE FROM market_listings WHERE listing_id = ?', (listing_id,))
@@ -1368,7 +1368,7 @@ def friends():
                                friendships=friendships, requests=requests_rows,
                                total=len(rows), table_missing=False)
 
-    # — Local mode —
+    # - Local mode -
     conn = get_db()
     missing_friends  = not table_exists(conn, 'friendships')
     missing_requests = not table_exists(conn, 'friend_requests')
@@ -1484,7 +1484,7 @@ def fantasy_cards():
         return render_template('fantasy_cards.html', rows=rows, cols=cols,
                                search=search, total=len(rows), table_missing=False)
 
-    # — Local mode —
+    # - Local mode -
     conn = get_db()
     if not table_exists(conn, 'fantasy_cards'):
         conn.close()
@@ -1595,12 +1595,12 @@ def test_connection():
         )
         if r.status_code == 200:
             data = r.json()
-            return jsonify(ok=True, msg=f'Connected — bot: {data.get("bot", "ok")}')
+            return jsonify(ok=True, msg=f'Connected - bot: {data.get("bot", "ok")}')
         if r.status_code == 401:
             return jsonify(ok=False, msg='Wrong API key.')
         return jsonify(ok=False, msg=f'HTTP {r.status_code}')
     except http.exceptions.ConnectionError:
-        return jsonify(ok=False, msg='Connection refused — is the bot running?')
+        return jsonify(ok=False, msg='Connection refused - is the bot running?')
     except http.exceptions.Timeout:
         return jsonify(ok=False, msg='Timed out after 5s.')
     except Exception as e:
