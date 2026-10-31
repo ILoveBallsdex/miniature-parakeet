@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Transfer Market — FutBot Dashboard{% endblock %}
+{% block title %}Transfer Market - FutBot Dashboard{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
@@ -12,7 +12,7 @@
 
 {% if table_missing %}
   <div class="alert alert-warning">
-    Table <code>market_listings</code> does not exist yet — run the bot once to create it.
+    Table <code>market_listings</code> does not exist yet - run the bot once to create it.
   </div>
 {% else %}
 
@@ -68,19 +68,19 @@
         <td>
           {% if row['overall'] %}
             <span class="badge ovr-badge ovr-{{ (row['overall'] // 10) * 10 }}">{{ row['overall'] }}</span>
-          {% else %}—{% endif %}
+          {% else %}-{% endif %}
         </td>
         <td>
           {% if row['card_rarity'] %}
             <span class="rarity-badge rarity-{{ row['card_rarity'] | replace(' ', '-') | lower }}">{{ row['card_rarity'] }}</span>
-          {% else %}—{% endif %}
+          {% else %}-{% endif %}
         </td>
         <td class="small">#{{ row['edition'] }}</td>
         <td class="fw-semibold">💰 {{ "{:,}".format(row['price']) }}</td>
         <td class="text-muted small">{{ row['seller_name'] or row['seller_id'] }}</td>
-        <td class="text-muted small">{{ row['buyer_name'] or ('—' if not row['buyer_id'] else row['buyer_id']) }}</td>
+        <td class="text-muted small">{{ row['buyer_name'] or ('-' if not row['buyer_id'] else row['buyer_id']) }}</td>
         <td class="text-muted small">{{ (row['listed_at'] or '')[:16] }}</td>
-        <td class="text-muted small">{{ (row['resolved_at'] or '')[:16] or '—' }}</td>
+        <td class="text-muted small">{{ (row['resolved_at'] or '')[:16] or '-' }}</td>
         <td>
           {% set s = row['status'] or 'active' %}
           {% if s == 'active' %}
