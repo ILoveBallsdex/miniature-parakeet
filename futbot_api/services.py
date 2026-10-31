@@ -370,6 +370,8 @@ def _match_card_name(rows, player_name):
         raise GameError("Enter at least two letters of the player's name.")
     normalize = lambda value: re.sub(r"[^a-z0-9 ]", "", " ".join(str(value or "").lower().split()))
     normalized_query = normalize(query)
+    if len(normalized_query) < 2:
+        raise GameError("Enter at least two letters of the player's name.")
     exact = [row for row in rows if normalize(row["name"]) == normalized_query]
     if exact:
         return exact[0]
