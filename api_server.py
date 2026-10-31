@@ -1376,6 +1376,8 @@ def seed_test_cards():
     for index, card in enumerate(test_cards):
         if services.get_card(card["card_id"]) is not None:
             continue
+        # Convert legacy seed values into the new stat fields and calculate OVR.
+        card.update(services._clean_catalog_card(card, True))
         image_path = card_dir / f'{card["card_id"]}.png'
         image = Image.new("RGB", (600, 840), colors[index % len(colors)])
         draw = ImageDraw.Draw(image)
@@ -1390,8 +1392,11 @@ def seed_test_cards():
         draw.text((50, 190), card["position"], font=title_font, fill=(255, 230, 150))
         draw.text((50, 430), card["name"], font=title_font, fill="white")
         draw.text((50, 510), card["club"], font=body_font, fill=(235, 235, 235))
-        draw.text((50, 590), f'ATK {card["attack"]}   DEF {card["defense"]}', font=body_font, fill="white")
-        draw.text((50, 645), f'SPD {card["speed"]}   {card["nation"]}', font=body_font, fill="white")
+        if str(card.get("position") or "").upper() == "GK":
+            draw.text((50, 590), f'GK {card["goalkeeping"]}', font=body_font, fill="white")
+        else:
+            draw.text((50, 590), f'SHO {card["shooting"]}  PAS {card["passing"]}', font=body_font, fill="white")
+            draw.text((50, 645), f'DRI {card["dribbling"]}  DEF {card["defense"]}', font=body_font, fill="white")
         image.save(image_path, format="PNG")
         card["image_path"] = f'cards/{card["card_id"]}.png'
         services.create_catalog_card(card)
