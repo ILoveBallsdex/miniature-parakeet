@@ -28,6 +28,11 @@ def card_value(overall: int) -> int:
     return 25
 
 
+def quicksell_value(overall: int) -> int:
+    """Return half of the card's catalog value, rounded down to whole coins."""
+    return card_value(overall) // 2
+
+
 def get_card(card_id: int):
     with read_connection() as db:
         row = db.execute("SELECT * FROM cards WHERE card_id = ?", (card_id,)).fetchone()
@@ -306,7 +311,7 @@ def open_pack(user_id: int, pack_id: int):
             db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, COALESCE((SELECT copies + 1 FROM cards WHERE card_id = ?), 1))", (user_id, card["card_id"], card["card_id"]))
             db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card["card_id"],))
         remaining = db.execute(f"SELECT {pack['name']} AS quantity FROM packs WHERE user_id = ?", (user_id,)).fetchone()["quantity"]
-    return {"pack_id": pack_id, "pack": pack["display_name"], "cards": [dict(card) for card in selected], "remaining": remaining}
+    return {"pack_id": pack_id, "pack": pack["display_name"], "cards": [{**dict(card), "quicksell_value": quicksell_value(card["overall"] or 0)} for card in selected], "remaining": remaining}
 
 
 def sell_cards(user_id: int, card_ids: list[int]):
@@ -324,6 +329,37 @@ def sell_cards(user_id: int, card_ids: list[int]):
         db.execute("UPDATE players SET coins = COALESCE(coins, 0) + ?, cards_sold = COALESCE(cards_sold, 0) + ? WHERE user_id = ?", (total, len(rows), user_id))
         balance = db.execute("SELECT coins FROM players WHERE user_id = ?", (user_id,)).fetchone()["coins"]
     return {"sold": len(rows), "coins_earned": total, "balance": balance}
+
+
+def quicksell_card(user_id: int, card_id: int):
+    """Sell one owned copy of a card for half its overall-based value."""
+    with transaction() as db:
+        row = db.execute(
+            """SELECT i.rowid AS inventory_row_id, c.overall
+            FROM inventories i JOIN cards c ON c.card_id = i.card_id
+            WHERE i.user_id = ? AND i.card_id = ?
+            ORDER BY i.rowid LIMIT 1""",
+            (user_id, card_id),
+        ).fetchone()
+        if row is None:
+            raise GameError("You do not own this player card.", 409)
+
+        coins_earned = quicksell_value(row["overall"] or 0)
+        db.execute("DELETE FROM inventories WHERE rowid = ?", (row["inventory_row_id"],))
+        db.execute(
+            "UPDATE players SET coins = COALESCE(coins, 0) + ?, cards_sold = COALESCE(cards_sold, 0) + 1 WHERE user_id = ?",
+            (coins_earned, user_id),
+        )
+        balance = db.execute(
+            "SELECT coins FROM players WHERE user_id = ?", (user_id,)
+        ).fetchone()["coins"]
+
+    return {
+        "card_id": card_id,
+        "coins_earned": coins_earned,
+        "balance": balance,
+        "sold": True,
+    }
 
 
 def toggle_wishlist(user_id: int, card_id: int):
