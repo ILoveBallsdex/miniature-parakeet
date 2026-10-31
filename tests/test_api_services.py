@@ -51,6 +51,20 @@ class FutBotServiceTests(unittest.TestCase):
         self.assertEqual(services.calculate_overall("CB", dribbling=100), 0)
         self.assertEqual(services.calculate_overall("CB", defense=100), 85)
 
+    def test_recalculate_backfills_missing_legacy_passing(self):
+        with transaction() as db:
+            db.execute(
+                """UPDATE cards SET position = 'ST', attack = 90, defense = 70, speed = 80,
+                shooting = 0, passing = 0, dribbling = 0, goalkeeping = 0
+                WHERE card_id = 1"""
+            )
+
+        services.recalculate_catalog_overalls()
+        card = services.get_card(1)
+        self.assertEqual(card["shooting"], 90)
+        self.assertEqual(card["passing"], 80)
+        self.assertEqual(card["dribbling"], 80)
+
     def test_buy_pack_requires_balance(self):
         with self.assertRaises(services.GameError):
             services.buy_pack(123, 1)
