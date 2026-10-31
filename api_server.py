@@ -364,11 +364,13 @@ async def player_lineup_image(request):
             if card and card.get("image_path"):
                 try:
                     with Image.open(resolve_asset_path(card["image_path"])) as source:
-                        artwork = ImageOps.fit(
-                        source.convert("RGB"),
-                        (card_width, card_height),
-                        method=Image.Resampling.LANCZOS,
-                    )
+                        # Resize the full card artwork into the fixed card box.
+                        # ImageOps.fit crops the edges when the source aspect ratio
+                        # differs, which was cutting off parts of the card.
+                        artwork = source.convert("RGB").resize(
+                            (card_width, card_height),
+                            Image.Resampling.LANCZOS,
+                        )
                     card_image = artwork
                     canvas.paste(card_image, (x, y))
                     penalty = int(card.get("position_penalty") or 0)
