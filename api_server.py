@@ -307,9 +307,13 @@ async def player_lineup_image(request):
         elif row_name == "gk":
             row_y += 400
         count = len(row)
-        # Give the back line its own wider spacing so LB/CB/RB use more
-        # of the available pitch width than the other rows.
-        row_gap_x = 1300 if row_name == "def" else gap_x
+        # Keep a four-player back line compact so the fullbacks stay
+        # close to the center-backs and remain comfortably inside the pitch.
+        if row_name == "def" and count == 4:
+            row_gap_x = 300
+        else:
+            # Three-player back lines can use the wider spacing.
+            row_gap_x = 1300 if row_name == "def" else gap_x
         total_width = count * card_width + max(0, count - 1) * row_gap_x
         # Center each line of players on the pitch.
         start_x = (canvas_width - total_width) // 2 - 15
