@@ -227,7 +227,8 @@ async def player_lineup_image(request):
             rows[row_name].sort(key=lambda item: int(item["slot"]))
 
     max_players = max(1, *(len(row) for row in rows.values()))
-    canvas_width = max(2800, padding_x * 2 + max_players * card_width + (max_players - 1) * gap_x)
+    # Use the maximum four-player row width for every formation so the pitch never changes size.
+    canvas_width = padding_x * 2 + 4 * card_width + 3 * gap_x
     row_height = card_height + label_height
     canvas_height = top_padding + len(row_order) * row_height + (len(row_order) - 1) * row_gap + 38
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
