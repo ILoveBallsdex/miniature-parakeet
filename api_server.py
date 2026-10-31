@@ -311,7 +311,10 @@ async def player_lineup_image(request):
             elif len(row) == 2 and formation_name == "2-4-1":
                 row_y += 1550  # A more moderate lift for the 2-4-1.
             elif len(row) == 4:
-                row_y += 1000  # Raise all four defenders moderately.
+                if formation_name in ("4-1-2", "4-2-1"):
+                    row_y += 650  # Move the full back line up a medium amount.
+                else:
+                    row_y += 1000  # Keep the existing adjustment for other four-defender layouts.
             else:
                 row_y += 500 if len(row) == 3 else 1800
         elif row_name == "gk":
