@@ -200,19 +200,12 @@ async def player_lineup_image(request):
     # Keep teammates in the same row far enough apart that their labels never collide.
     gap_x, padding_x = 420, 275
     row_gap, top_padding = 60, 115
-    row_order = ("att", "mid", "def", "gk")
+    row_order = ("att", "cam", "mid", "def", "gk")
     position_rows = {
         "GK": "gk",
-        "LB": "def", "LCB": "def", "CB": "def", "RCB": "def", "RB": "def",
-        "LWB": "def", "RWB": "def",
-        "CDM": "mid", "CM": "mid", "CAM": "mid", "LM": "mid", "RM": "mid",
+        "LB": "def", "CB": "def", "RB": "def",
+        "CDM": "mid", "CM": "mid", "CAM": "cam",
         "LW": "att", "ST": "att", "CF": "att", "RW": "att",
-    }
-    left_to_right = {
-        "LB": 0, "LWB": 1, "LCB": 2, "CB": 3, "RCB": 4, "RWB": 5, "RB": 6,
-        "LM": 0, "CDM": 1, "CM": 2, "CAM": 3, "RM": 4,
-        "LW": 0, "ST": 1, "CF": 2, "RW": 3,
-        "GK": 0,
     }
     rows = {name: [] for name in row_order}
     for slot in lineup["slots"]:
@@ -220,9 +213,8 @@ async def player_lineup_image(request):
         row_name = position_rows.get(position, "mid")
         rows[row_name].append(slot)
     for row_name in row_order:
-        rows[row_name].sort(
-            key=lambda item: (left_to_right.get(str(item.get("position") or "").upper(), 99), int(item["slot"]))
-        )
+        # Slot order follows the selected formation's intended left-to-right layout.
+        rows[row_name].sort(key=lambda item: int(item["slot"]))
 
     max_players = max(1, *(len(row) for row in rows.values()))
     canvas_width = max(2000, padding_x * 2 + max_players * card_width + (max_players - 1) * gap_x)
