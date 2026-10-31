@@ -302,10 +302,14 @@ async def player_lineup_image(request):
     for row_index, row_name in enumerate(row_order):
         row = rows[row_name]
         row_y = top_padding + row_index * (row_height + row_gap)
-        # Give the deeper midfield role extra room, then shift the back line
-        # and goalkeeper down to keep the CDM card and its position label clear.
-        if row_name in ("def", "gk"):
-            row_y += 350
+        # Keep the front three high. Drop the rest of the formation,
+        # with the defensive line closer to the goalkeeper.
+        if row_name == "mid":
+            row_y += 250
+        elif row_name == "def":
+            row_y += 650
+        elif row_name == "gk":
+            row_y += 400
         count = len(row)
         total_width = count * card_width + max(0, count - 1) * gap_x
         # Center each line of players on the pitch.
@@ -331,6 +335,8 @@ async def player_lineup_image(request):
             position = str(slot.get("position") or "").upper()
             x = start_x + index * (card_width + gap_x)
             y = row_y
+            if row_name == "att" and position == "CF":
+                y += 250
 
             if row_name == "mid" and special_midfield_count:
                 if position == "CM":
@@ -345,7 +351,7 @@ async def player_lineup_image(request):
                     cm_index += 1
                 elif position in ("CAM", "CDM"):
                     x = canvas_width // 2 - card_width // 2
-                    y = row_y - 600 if position == "CAM" else row_y + 600
+                    y = row_y - 600 if position == "CAM" else row_y + 670
 
             card = slot.get("card")
             if card and card.get("image_path"):
