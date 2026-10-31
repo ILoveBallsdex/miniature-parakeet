@@ -835,6 +835,8 @@ def _resolve_battle_round(db, row, state):
         p1_value, p2_value = p1_card["speed"], p2_card["speed"]
         stat = "Speed vs Speed"
 
+    p1_effective = int(state.get("p1_effective_overall", {}).get(str(p1_card["card_id"]), p1_card["overall"] or 0))
+    p2_effective = int(state.get("p2_effective_overall", {}).get(str(p2_card["card_id"]), p2_card["overall"] or 0))
     winner_id = None
     if (p1_value or 0) > (p2_value or 0):
         winner_id = p1_id
@@ -844,9 +846,7 @@ def _resolve_battle_round(db, row, state):
         winner_id = p2_id
         state["p2_wins"] += 1
         result = f"Player {p2_id} wins with {stat}."
-    p1_effective = int(state.get("p1_effective_overall", {}).get(str(p1_card["card_id"]), p1_card["overall"] or 0))
-    p2_effective = int(state.get("p2_effective_overall", {}).get(str(p2_card["card_id"]), p2_card["overall"] or 0))
-    if p1_effective > p2_effective:
+    elif p1_effective > p2_effective:
         winner_id = p1_id
         state["p1_wins"] += 1
         result = f"Stats tied; player {p1_id} wins on effective overall ({p1_effective} vs {p2_effective})."
