@@ -499,16 +499,13 @@ async def battle_decline(request):
     return success(services.decline_battle(request.match_info["battle_id"], user_id))
 
 
-async def battle_select_deck(request):
+async def battle_select_lineup(request):
     payload = await read_json(request)
     try:
         user_id = int(payload["user_id"])
-        deck_name = payload["deck_name"]
     except (KeyError, TypeError, ValueError):
-        raise services.GameError("user_id and deck_name are required.")
-    if not isinstance(deck_name, str):
-        raise services.GameError("deck_name must be a string.")
-    return success(services.select_battle_deck(request.match_info["battle_id"], user_id, deck_name))
+        raise services.GameError("user_id is required.")
+    return success(services.select_battle_lineup(request.match_info["battle_id"], user_id))
 
 
 async def battle_action(request):
@@ -1014,7 +1011,7 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_get("/api/v1/battles/{battle_id}", battle_detail)
     app.router.add_post("/api/v1/battles/{battle_id}/accept", battle_accept)
     app.router.add_post("/api/v1/battles/{battle_id}/decline", battle_decline)
-    app.router.add_post("/api/v1/battles/{battle_id}/decks", battle_select_deck)
+    app.router.add_post("/api/v1/battles/{battle_id}/lineup", battle_select_lineup)
     app.router.add_post("/api/v1/battles/{battle_id}/action", battle_action)
     app.router.add_post("/api/v1/battles/{battle_id}/card", battle_card)
     app.router.add_post("/api/v1/battles/{battle_id}/next", battle_next_round)
