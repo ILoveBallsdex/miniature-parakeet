@@ -380,6 +380,8 @@ def _match_card_name(rows, player_name):
         return partial[0]
     if len(partial) > 1:
         names = list(dict.fromkeys(str(row["name"]) for row in partial))
+        if len(names) == 1:
+            return partial[0]
         raise GameError("That name matches multiple players: " + ", ".join(names[:8]) + ". Type more of the name.")
 
     # Compare against full names and individual name parts. Keep the threshold
@@ -400,7 +402,8 @@ def _match_card_name(rows, player_name):
         raise GameError("I couldn't find a player matching that name. Check the spelling and try again.", 404)
     if len(scored) > 1 and scored[0][0] - scored[1][0] < 0.06:
         names = list(dict.fromkeys(str(item[1]["name"]) for item in scored[:5]))
-        raise GameError("That could match multiple players: " + ", ".join(names) + ". Type more of the name.")
+        if len(names) > 1:
+            raise GameError("That could match multiple players: " + ", ".join(names) + ". Type more of the name.")
     return scored[0][1]
 
 
