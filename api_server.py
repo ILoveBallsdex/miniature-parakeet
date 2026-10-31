@@ -302,9 +302,8 @@ async def player_lineup_image(request):
         if row_name == "mid":
             row_y += 0 if len(rows["def"]) == 3 else 500
         elif row_name == "def":
-            # Raise a three-player back line so its CB stays clearly visible
-            # above the goalkeeper, with midfield shifted up when present.
-            row_y += 500 if len(row) == 3 else 1800
+            # Raise the four-player back line while keeping the other layouts.
+            row_y += 500 if len(row) == 3 else 1350 if len(row) == 4 else 1800
         elif row_name == "gk":
             row_y += 400
         count = len(row)
@@ -316,8 +315,8 @@ async def player_lineup_image(request):
         elif row_name == "def" and count == 3:
             row_gap_x = 1050
         elif row_name == "def" and count == 2:
-            # Keep the two center-backs farther apart in two-defender formations.
-            row_gap_x = 1100
+            # Give the two center-backs substantially more separation.
+            row_gap_x = 1800
         elif row_name == "att" and len(rows["def"]) == 4 and sum(
             str(item.get("position") or "").upper() == "ST" for item in row
         ) == 2:
@@ -341,11 +340,15 @@ async def player_lineup_image(request):
         special_midfield_count = sum(
             position in ("CAM", "CDM") for position in midfield_positions
         )
-        # Use wider spacing for the two central midfielders in the requested
-        # two-, three-, and 4-2-1-defender layouts.
+        # Tune the two-CM spacing by formation family. The 2-4-1 is
+        # intentionally tighter; other two-defender and three-defender
+        # formations get more separation.
+        formation_name = str(lineup.get("formation") or "").replace(" ", "").upper()
         cm_gap_x = gap_x
-        if len(cm_items) == 2 and len(rows["def"]) in (2, 3):
-            cm_gap_x = 1100
+        if len(cm_items) == 2 and len(rows["def"]) == 2:
+            cm_gap_x = 500 if formation_name == "2-4-1" else 1450
+        elif len(cm_items) == 2 and len(rows["def"]) == 3:
+            cm_gap_x = 1400
         elif len(cm_items) == 2 and len(rows["def"]) == 4:
             cm_gap_x = 950
         cm_total_width = len(cm_items) * card_width + max(0, len(cm_items) - 1) * cm_gap_x
