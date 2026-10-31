@@ -156,10 +156,10 @@ async def player_lineup_image(request):
 
     # Arrange the saved formation as a vertical football pitch:
     # attackers at the top, then midfield, defenders, and the goalkeeper.
-    card_width, card_height = 176, 246
-    label_height = 52
-    gap_x, padding_x = 24, 34
-    row_gap, top_padding = 54, 82
+    card_width, card_height = 210, 294
+    label_height = 66
+    gap_x, padding_x = 24, 40
+    row_gap, top_padding = 48, 92
     row_order = ("att", "mid", "def", "gk")
     position_rows = {
         "GK": "gk",
@@ -185,17 +185,17 @@ async def player_lineup_image(request):
         )
 
     max_players = max(1, *(len(row) for row in rows.values()))
-    canvas_width = max(900, padding_x * 2 + max_players * card_width + (max_players - 1) * gap_x)
+    canvas_width = max(1040, padding_x * 2 + max_players * card_width + (max_players - 1) * gap_x)
     row_height = card_height + label_height
     canvas_height = top_padding + len(row_order) * row_height + (len(row_order) - 1) * row_gap + 38
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
     draw = ImageDraw.Draw(canvas)
 
     try:
-        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 15)
-        small_font = ImageFont.truetype("DejaVuSans.ttf", 13)
-        badge_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 22)
-        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 30)
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 20)
+        small_font = ImageFont.truetype("DejaVuSans.ttf", 17)
+        badge_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 25)
+        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 34)
     except OSError:
         font = small_font = badge_font = title_font = ImageFont.load_default()
 
@@ -219,7 +219,7 @@ async def player_lineup_image(request):
         count = len(row)
         total_width = count * card_width + max(0, count - 1) * gap_x
         # Center even a single player/card on the pitch.
-        start_x = (canvas_width - total_width) // 2
+        start_x = (canvas_width - total_width) // 2 + 24
         for index, slot in enumerate(row):
             x = start_x + index * (card_width + gap_x)
             card = slot.get("card")
