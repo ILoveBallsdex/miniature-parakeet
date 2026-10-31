@@ -293,11 +293,6 @@ async def player_lineup_image(request):
     title_width = title_box[2] - title_box[0]
     draw.text(((canvas_width - title_width) // 2, 23),
               title, font=title_font, fill=(255, 255, 255))
-    subtitle = f"{lineup.get('filled', 0)}/8 PLAYERS"
-    subtitle_box = draw.textbbox((0, 0), subtitle, font=small_font)
-    subtitle_width = subtitle_box[2] - subtitle_box[0]
-    draw.text(((canvas_width - subtitle_width) // 2, 275),
-              subtitle, font=small_font, fill=(235, 245, 235))
 
     for row_index, row_name in enumerate(row_order):
         row = rows[row_name]
