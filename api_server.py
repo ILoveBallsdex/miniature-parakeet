@@ -227,10 +227,10 @@ async def player_lineup_image(request):
     from PIL import Image, ImageDraw, ImageFont, ImageOps
 
     # Keep the same near-2:3 portrait ratio Discord displayed larger before, with larger cards.
-    card_width, card_height = 937, 875
-    label_height = 160
-    gap_x, padding_x = 135, 60
-    row_gap, top_padding = 0, 160
+    card_width, card_height = 625, 1094
+    label_height = 200
+    gap_x, padding_x = 169, 75
+    row_gap, top_padding = 0, 200
     row_order = ("att", "cam", "mid", "cdm", "def", "gk")
     position_rows = {
         "GK": "gk",
@@ -266,16 +266,16 @@ async def player_lineup_image(request):
 
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        position_font = ImageFont.truetype(font_path, 110)
-        name_font = ImageFont.truetype(font_path, 85)
-        small_font = ImageFont.truetype(font_path, 72)
-        badge_font = ImageFont.truetype(font_path, 95)
+        position_font = ImageFont.truetype(font_path, 138)
+        name_font = ImageFont.truetype(font_path, 106)
+        small_font = ImageFont.truetype(font_path, 90)
+        badge_font = ImageFont.truetype(font_path, 119)
         title_font = ImageFont.truetype(font_path, 110)
     except OSError:
-        position_font = ImageFont.load_default(size=110)
-        name_font = ImageFont.load_default(size=85)
-        small_font = ImageFont.load_default(size=72)
-        badge_font = ImageFont.load_default(size=95)
+        position_font = ImageFont.load_default(size=138)
+        name_font = ImageFont.load_default(size=106)
+        small_font = ImageFont.load_default(size=90)
+        badge_font = ImageFont.load_default(size=119)
         title_font = ImageFont.load_default(size=110)
 
     # Pitch markings.
@@ -290,12 +290,12 @@ async def player_lineup_image(request):
     title = f"{lineup.get('formation', '2-2-3')} FORMATION"
     title_box = draw.textbbox((0, 0), title, font=title_font)
     title_width = title_box[2] - title_box[0]
-    draw.text(((canvas_width - title_width) // 2, 18),
+    draw.text(((canvas_width - title_width) // 2, 23),
               title, font=title_font, fill=(255, 255, 255))
     subtitle = f"{lineup.get('filled', 0)}/8 PLAYERS"
     subtitle_box = draw.textbbox((0, 0), subtitle, font=small_font)
     subtitle_width = subtitle_box[2] - subtitle_box[0]
-    draw.text(((canvas_width - subtitle_width) // 2, 220),
+    draw.text(((canvas_width - subtitle_width) // 2, 275),
               subtitle, font=small_font, fill=(235, 245, 235))
 
     for row_index, row_name in enumerate(row_order):
@@ -304,7 +304,7 @@ async def player_lineup_image(request):
         count = len(row)
         total_width = count * card_width + max(0, count - 1) * gap_x
         # Center even a single player/card on the pitch.
-        start_x = (canvas_width - total_width) // 2 - 12
+        start_x = (canvas_width - total_width) // 2 - 15
         for index, slot in enumerate(row):
             x = start_x + index * (card_width + gap_x)
             card = slot.get("card")
@@ -322,13 +322,13 @@ async def player_lineup_image(request):
                     if penalty > 0:
                         badge_text = f"-{penalty}"
                         bounds = draw.textbbox((0, 0), badge_text, font=badge_font)
-                        badge_w = bounds[2] - bounds[0] + 105
-                        badge_h = bounds[3] - bounds[1] + 85
-                        bx, by = x + card_width - badge_w - 10, y + 10
+                        badge_w = bounds[2] - bounds[0] + 131
+                        badge_h = bounds[3] - bounds[1] + 106
+                        bx, by = x + card_width - badge_w - 13, y + 13
                         draw.rounded_rectangle((bx, by, bx + badge_w, by + badge_h),
-                                               radius=38, fill=(210, 25, 38),
-                                               outline=(255, 255, 255), width=12)
-                        draw.text((bx + 52, by + 40), badge_text,
+                                               radius=48, fill=(210, 25, 38),
+                                               outline=(255, 255, 255), width=15)
+                        draw.text((bx + 65, by + 50), badge_text,
                                   font=badge_font, fill=(255, 255, 255),
                                   stroke_width=1, stroke_fill=(120, 0, 0))
                 except Exception:
@@ -358,9 +358,9 @@ async def player_lineup_image(request):
                 name_font_for_player = name_font
                 while draw.textbbox((0, 0), name_label, font=name_font_for_player)[2] > card_width - 12:
                     current_size = getattr(name_font_for_player, "size", 80)
-                    if current_size <= 45:
+                    if current_size <= 56:
                         break
-                    name_font_for_player = ImageFont.truetype(font_path, current_size - 7)
+                    name_font_for_player = ImageFont.truetype(font_path, current_size - 9)
                 rating_label = f"{card.get('effective_overall', card.get('overall', '-'))} OVR"
             else:
                 name_label = "Empty"
@@ -377,10 +377,10 @@ async def player_lineup_image(request):
                       font=position_font, fill=(255, 255, 255),
                       stroke_width=1, stroke_fill=(20, 45, 30))
             draw.text((label_center_x - (name_box[2] - name_box[0]) // 2,
-                       y + card_height + 220), name_label,
+                       y + card_height + 275), name_label,
                       font=name_font, fill=(255, 255, 255))
             draw.text((label_center_x - (rating_box[2] - rating_box[0]) // 2,
-                       y + card_height + 380), rating_label,
+                       y + card_height + 475), rating_label,
                       font=small_font, fill=(235, 245, 235))
 
     # Keep the generated image at its native dimensions to limit Railway memory use.
