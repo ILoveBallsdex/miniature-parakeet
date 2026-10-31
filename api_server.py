@@ -195,11 +195,11 @@ async def player_lineup_image(request):
 
     # Arrange the saved formation as a vertical football pitch:
     # attackers at the top, then midfield, defenders, and the goalkeeper.
-    card_width, card_height = 525, 735
-    label_height = 575
+    card_width, card_height = 700, 980
+    label_height = 700
     # Keep teammates in the same row far enough apart that their labels never collide.
-    gap_x, padding_x = 420, 275
-    row_gap, top_padding = 60, 115
+    gap_x, padding_x = 400, 350
+    row_gap, top_padding = 55, 130
     row_order = ("att", "cam", "mid", "cdm", "def", "gk")
     position_rows = {
         "GK": "gk",
@@ -228,35 +228,35 @@ async def player_lineup_image(request):
 
     # Every formation uses the exact same large pitch dimensions.
     # Player count only changes their positions within a row, never the pitch size.
-    canvas_width = 5200
-    canvas_height = 9000
+    canvas_width = 7200
+    canvas_height = 10800
     row_height = card_height + label_height
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
     draw = ImageDraw.Draw(canvas)
 
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        position_font = ImageFont.truetype(font_path, 188)
-        name_font = ImageFont.truetype(font_path, 100)
-        small_font = ImageFont.truetype(font_path, 90)
-        badge_font = ImageFont.truetype(font_path, 105)
-        title_font = ImageFont.truetype(font_path, 138)
+        position_font = ImageFont.truetype(font_path, 250)
+        name_font = ImageFont.truetype(font_path, 135)
+        small_font = ImageFont.truetype(font_path, 120)
+        badge_font = ImageFont.truetype(font_path, 140)
+        title_font = ImageFont.truetype(font_path, 185)
     except OSError:
-        position_font = ImageFont.load_default(size=188)
-        name_font = ImageFont.load_default(size=100)
-        small_font = ImageFont.load_default(size=90)
-        badge_font = ImageFont.load_default(size=105)
-        title_font = ImageFont.load_default(size=138)
+        position_font = ImageFont.load_default(size=250)
+        name_font = ImageFont.load_default(size=135)
+        small_font = ImageFont.load_default(size=120)
+        badge_font = ImageFont.load_default(size=140)
+        title_font = ImageFont.load_default(size=185)
 
     # Pitch markings.
     draw.rectangle((14, 14, canvas_width - 14, canvas_height - 14), outline=(220, 242, 225), width=4)
     draw.line((14, canvas_height // 2, canvas_width - 14, canvas_height // 2), fill=(220, 242, 225), width=3)
-    draw.ellipse((canvas_width // 2 - 75, canvas_height // 2 - 75,
-                  canvas_width // 2 + 75, canvas_height // 2 + 75), outline=(220, 242, 225), width=2)
-    draw.rectangle((canvas_width // 2 - 180, 14, canvas_width // 2 + 180, 115),
+    draw.ellipse((canvas_width // 2 - 100, canvas_height // 2 - 100,
+                  canvas_width // 2 + 100, canvas_height // 2 + 100), outline=(220, 242, 225), width=3)
+    draw.rectangle((canvas_width // 2 - 240, 14, canvas_width // 2 + 240, 155),
                    outline=(220, 242, 225), width=2)
-    draw.rectangle((canvas_width // 2 - 180, canvas_height - 115,
-                    canvas_width // 2 + 180, canvas_height - 14), outline=(220, 242, 225), width=2)
+    draw.rectangle((canvas_width // 2 - 240, canvas_height - 155,
+                    canvas_width // 2 + 240, canvas_height - 14), outline=(220, 242, 225), width=2)
     title = f"{lineup.get('formation', '2-2-3')} FORMATION"
     title_box = draw.textbbox((0, 0), title, font=title_font)
     title_width = title_box[2] - title_box[0]
@@ -286,13 +286,13 @@ async def player_lineup_image(request):
                     if penalty > 0:
                         badge_text = f"-{penalty}"
                         bounds = draw.textbbox((0, 0), badge_text, font=badge_font)
-                        badge_w = bounds[2] - bounds[0] + 80
-                        badge_h = bounds[3] - bounds[1] + 65
+                        badge_w = bounds[2] - bounds[0] + 105
+                        badge_h = bounds[3] - bounds[1] + 85
                         bx, by = x + card_width - badge_w - 10, y + 10
                         draw.rounded_rectangle((bx, by, bx + badge_w, by + badge_h),
-                                               radius=30, fill=(210, 25, 38),
-                                               outline=(255, 255, 255), width=9)
-                        draw.text((bx + 40, by + 30), badge_text,
+                                               radius=38, fill=(210, 25, 38),
+                                               outline=(255, 255, 255), width=12)
+                        draw.text((bx + 52, by + 40), badge_text,
                                   font=badge_font, fill=(255, 255, 255),
                                   stroke_width=1, stroke_fill=(120, 0, 0))
                 except Exception:
@@ -322,9 +322,9 @@ async def player_lineup_image(request):
                 name_font_for_player = name_font
                 while draw.textbbox((0, 0), name_label, font=name_font_for_player)[2] > card_width - 12:
                     current_size = getattr(name_font_for_player, "size", 80)
-                    if current_size <= 35:
+                    if current_size <= 45:
                         break
-                    name_font_for_player = ImageFont.truetype(font_path, current_size - 5)
+                    name_font_for_player = ImageFont.truetype(font_path, current_size - 7)
                 rating_label = f"{card.get('effective_overall', card.get('overall', '-'))} OVR"
             else:
                 name_label = "Empty"
@@ -341,10 +341,10 @@ async def player_lineup_image(request):
                       font=position_font, fill=(255, 255, 255),
                       stroke_width=1, stroke_fill=(20, 45, 30))
             draw.text((label_center_x - (name_box[2] - name_box[0]) // 2,
-                       y + card_height + 288), name_label,
+                       y + card_height + 350), name_label,
                       font=name_font, fill=(255, 255, 255))
             draw.text((label_center_x - (rating_box[2] - rating_box[0]) // 2,
-                       y + card_height + 400), rating_label,
+                       y + card_height + 500), rating_label,
                       font=small_font, fill=(235, 245, 235))
 
     # Keep the generated image at its native dimensions. The previous
