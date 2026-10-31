@@ -315,6 +315,8 @@ async def player_lineup_image(request):
                     row_y += 650  # Move the full back line up a medium amount.
                 else:
                     row_y += 1000  # Keep the existing adjustment for other four-defender layouts.
+            elif len(row) == 2 and formation_name == "2-2-3":
+                row_y += 1400  # Raise the 2-2-3 center-backs.
             else:
                 row_y += 500 if len(row) == 3 else 1800
         elif row_name == "gk":
@@ -359,9 +361,9 @@ async def player_lineup_image(request):
         formation_name = str(lineup.get("formation") or "").replace(" ", "").upper()
         cm_gap_x = gap_x
         if len(cm_items) == 2 and len(rows["def"]) == 2:
-            cm_gap_x = 500 if formation_name == "2-4-1" else 1450
+            cm_gap_x = 500 if formation_name == "2-4-1" else 1600
         elif len(cm_items) == 2 and len(rows["def"]) == 3:
-            cm_gap_x = 1600 if formation_name == "3-3-1CDM" else 1400
+            cm_gap_x = 1900 if formation_name == "3-3-1CDM" else 1400
         elif len(cm_items) == 2 and len(rows["def"]) == 4:
             cm_gap_x = 950
         cm_total_width = len(cm_items) * card_width + max(0, len(cm_items) - 1) * cm_gap_x
@@ -388,15 +390,17 @@ async def player_lineup_image(request):
             if row_name == "att" and position == "ST" and len(rows["def"]) == 4:
                 if formation_name == "4-1-2":
                     y += 200
+                elif formation_name == "3-2-2":
+                    y += 300
 
             if row_name == "mid" and special_midfield_count:
                 if position == "CM":
                     if formation_name == "3-2-2":
-                        y += 350
+                        y += 700
                     elif formation_name == "3-3-1CAM":
-                        y += 600
+                        y += 900
                     elif formation_name == "3-3-1CM":
-                        y += 350
+                        y += 600
                     if special_midfield_count == 2 and len(cm_items) == 2:
                         # Keep the two CMs wide so the CAM/CDM center lane stays clear.
                         center = canvas_width // 2
@@ -411,12 +415,12 @@ async def player_lineup_image(request):
                     if position == "CAM":
                         y = row_y - 550
                         if formation_name == "3-3-1CAM":
-                            y += 600
+                            y += 900
                     elif position == "CDM":
                         if len(rows["def"]) == 3:
                             y = row_y + 500
                             if formation_name == "3-3-1CDM":
-                                y += 200
+                                y += 500
                         elif len(rows["def"]) == 2:
                             y = row_y + 1200
                         else:
