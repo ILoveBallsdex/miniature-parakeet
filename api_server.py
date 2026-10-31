@@ -148,6 +148,64 @@ async def card_image(request):
     return web.FileResponse(resolve_asset_path(card.get("image_path")))
 
 
+async def player_lineup_image(request):
+    user_id = int(request.match_info["user_id"])
+    lineup = services.get_lineup(user_id)
+    from io import BytesIO
+    from PIL import Image, ImageDraw, ImageFont
+
+    card_width, card_height = 300, 420
+    gap, padding, label_height = 18, 24, 38
+    columns, rows = 4, 2
+    canvas_width = padding * 2 + columns * card_width + (columns - 1) * gap
+    canvas_height = padding * 2 + rows * (card_height + label_height) + (rows - 1) * gap
+    canvas = Image.new("RGB", (canvas_width, canvas_height), (24, 27, 35))
+    draw = ImageDraw.Draw(canvas)
+    try:
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 18)
+        badge_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 24)
+    except OSError:
+        font = ImageFont.load_default()
+        badge_font = ImageFont.load_default()
+
+    for index, slot in enumerate(lineup["slots"]):
+        col, row = index % columns, index // columns
+        x = padding + col * (card_width + gap)
+        y = padding + row * (card_height + label_height + gap)
+        card = slot.get("card")
+        if card and card.get("image_path"):
+            try:
+                with Image.open(resolve_asset_path(card["image_path"])) as source:
+                    artwork = source.convert("RGB")
+                artwork.thumbnail((card_width, card_height), Image.Resampling.LANCZOS)
+                card_image = Image.new("RGB", (card_width, card_height), (38, 41, 50))
+                card_image.paste(artwork, ((card_width - artwork.width) // 2, (card_height - artwork.height) // 2))
+                canvas.paste(card_image, (x, y))
+                penalty = int(card.get("position_penalty") or 0)
+                if penalty > 0:
+                    badge_text = f"-{penalty}"
+                    bounds = draw.textbbox((0, 0), badge_text, font=badge_font)
+                    badge_w = bounds[2] - bounds[0] + 24
+                    badge_h = bounds[3] - bounds[1] + 18
+                    bx, by = x + card_width - badge_w - 8, y + 8
+                    draw.rounded_rectangle((bx, by, bx + badge_w, by + badge_h), radius=10, fill=(210, 35, 45), outline=(255, 255, 255), width=2)
+                    draw.text((bx + 12, by + 7), badge_text, font=badge_font, fill=(255, 255, 255))
+            except services.GameError:
+                card = None
+            except Exception:
+                card = None
+
+        if card:
+            label = f"Slot {slot['slot']} · {slot['position']}  |  {card['name']} · {card['effective_overall']} OVR"
+        else:
+            label = f"Slot {slot['slot']} · {slot['position']}  |  Empty"
+        draw.text((x, y + card_height + 8), label[:48], font=font, fill=(240, 240, 245))
+
+    output = BytesIO()
+    canvas.save(output, format="PNG")
+    return web.Response(body=output.getvalue(), content_type="image/png")
+
+
 async def card_compare_image(request):
     raw_ids = request.query.get("ids", "")
     try:
@@ -943,6 +1001,7 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/players/{user_id:\\d+}/cards/{card_id:\\d+}/minted", minted_card_image)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/packs", player_packs)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/lineup", player_lineup)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/lineup/image", player_lineup_image)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/lineup/add", add_player_lineup)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/lineup/remove", remove_player_lineup)
     app.router.add_put("/api/v1/players/{user_id:\\d+}/lineup/formation", set_player_formation)
