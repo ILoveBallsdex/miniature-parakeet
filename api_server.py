@@ -223,6 +223,19 @@ async def player_lineup_image(request):
                     int(item["slot"]),
                 )
             )
+        elif row_name == "mid" and sum(
+            str(item.get("position") or "").upper() == "CDM" for item in rows[row_name]
+        ) == 1 and sum(
+            str(item.get("position") or "").upper() == "CM" for item in rows[row_name]
+        ) == 2:
+            # Keep the CDM central, with one CM on either side.
+            midfielders = rows[row_name]
+            cms = sorted(
+                (item for item in midfielders if str(item.get("position") or "").upper() == "CM"),
+                key=lambda item: int(item["slot"]),
+            )
+            cdm = next(item for item in midfielders if str(item.get("position") or "").upper() == "CDM")
+            rows[row_name] = [cms[0], cdm, cms[1]]
         else:
             rows[row_name].sort(key=lambda item: int(item["slot"]))
 
