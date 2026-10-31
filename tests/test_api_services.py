@@ -125,6 +125,25 @@ class FutBotServiceTests(unittest.TestCase):
         self.assertEqual(result["coins_earned"], services.card_value(92) // 2)
         self.assertEqual(services.get_player(123)["coins"], services.card_value(92) // 2)
 
+
+    def test_formations_use_only_standard_defensive_slots(self):
+        expected = {
+            "2-2-3": ["GK", "CB", "CB", "CM", "CM", "LW", "ST", "RW"],
+            "3-2-2": ["GK", "CB", "LB", "RB", "CM", "CM", "ST", "CF"],
+            "2-3-2": ["GK", "CB", "CB", "CM", "CM", "CAM", "ST", "CF"],
+            "4-2-1": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "ST"],
+            "3-3-1": ["GK", "CB", "LB", "RB", "CM", "CM", "CAM", "ST"],
+        }
+        self.assertEqual(services.FORMATIONS, expected)
+        for positions in services.FORMATIONS.values():
+            self.assertFalse(set(positions) & {"LCB", "RCB", "LWB", "RWB", "LM", "RM"})
+
+    def test_legacy_wide_and_center_back_positions_match_standard_slots(self):
+        for old_position in ("LCB", "RCB", "LWB", "RWB"):
+            self.assertEqual(services.position_penalty(old_position, "CB"), 0)
+        self.assertEqual(services.position_penalty("LM", "CM"), 0)
+        self.assertEqual(services.position_penalty("RM", "CM"), 0)
+
     def test_lineup_swap_moves_player_into_empty_slot(self):
         with transaction() as db:
             db.execute(
