@@ -194,15 +194,15 @@ async def player_lineup_image(request):
     from PIL import Image, ImageDraw, ImageFont, ImageOps
 
     # Use a compact four-row layout so the cards occupy most of the Discord embed.
-    card_width, card_height = 1000, 1400
+    card_width, card_height = 900, 1260
     label_height = 330
-    gap_x, padding_x = 180, 120
-    row_gap, top_padding = 0, 250
-    row_order = ("att", "mid", "def", "gk")
+    gap_x, padding_x = 300, 150
+    row_gap, top_padding = 0, 440
+    row_order = ("att", "cam", "mid", "cdm", "def", "gk")
     position_rows = {
         "GK": "gk",
         "LB": "def", "CB": "def", "RB": "def",
-        "CDM": "mid", "CM": "mid", "CAM": "mid",
+        "CDM": "cdm", "CM": "mid", "CAM": "cam",
         "LW": "att", "ST": "att", "CF": "att", "RW": "att",
     }
     rows = {name: [] for name in row_order}
@@ -221,20 +221,12 @@ async def player_lineup_image(request):
                     int(item["slot"]),
                 )
             )
-        elif row_name == "mid":
-            midfield_order = {"CAM": 0, "CM": 1, "CDM": 2}
-            rows[row_name].sort(
-                key=lambda item: (
-                    midfield_order.get(str(item.get("position") or "").upper(), 1),
-                    int(item["slot"]),
-                )
-            )
         else:
             rows[row_name].sort(key=lambda item: int(item["slot"]))
 
     # Keep a 2:3 image ratio for Discord while giving each card much more space.
     canvas_width = 4800
-    canvas_height = 7200
+    canvas_height = 10000
     row_height = card_height + label_height
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
     draw = ImageDraw.Draw(canvas)
@@ -270,7 +262,7 @@ async def player_lineup_image(request):
     subtitle = f"{lineup.get('filled', 0)}/8 PLAYERS"
     subtitle_box = draw.textbbox((0, 0), subtitle, font=small_font)
     subtitle_width = subtitle_box[2] - subtitle_box[0]
-    draw.text(((canvas_width - subtitle_width) // 2, 190),
+    draw.text(((canvas_width - subtitle_width) // 2, 220),
               subtitle, font=small_font, fill=(235, 245, 235))
 
     for row_index, row_name in enumerate(row_order):
