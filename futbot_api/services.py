@@ -779,7 +779,10 @@ def swap_lineup_players(user_id,slot1,slot2):
   if not row: raise GameError("You don't have a lineup yet.",404)
   slots=json.loads(row["slots"])
   first,second=slots.get(str(slot1)),slots.get(str(slot2))
-  if first is None or second is None: raise GameError("Both slots must contain a player before you can swap them.",404)
+  if first is None and second is None:
+   raise GameError("At least one of those slots must contain a player.",404)
+  # If one slot is empty, move the player into it and leave the original empty.
+  # If both slots are occupied, perform a normal swap.
   slots[str(slot1)],slots[str(slot2)]=second,first
   db.execute("UPDATE lineups SET slots=? WHERE user_id=?",(json.dumps(slots),user_id))
   return _lineup_data(db,user_id)
