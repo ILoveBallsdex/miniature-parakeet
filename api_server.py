@@ -157,8 +157,8 @@ async def player_lineup_image(request):
     # Arrange the saved formation as a vertical football pitch:
     # attackers at the top, then midfield, defenders, and the goalkeeper.
     card_width, card_height = 420, 588
-    label_height = 430
-    gap_x, padding_x = 48, 80
+    label_height = 460
+    gap_x, padding_x = 56, 100
     row_gap, top_padding = 48, 92
     row_order = ("att", "mid", "def", "gk")
     position_rows = {
@@ -185,20 +185,25 @@ async def player_lineup_image(request):
         )
 
     max_players = max(1, *(len(row) for row in rows.values()))
-    canvas_width = max(1040, padding_x * 2 + max_players * card_width + (max_players - 1) * gap_x)
+    canvas_width = max(1600, padding_x * 2 + max_players * card_width + (max_players - 1) * gap_x)
     row_height = card_height + label_height
     canvas_height = top_padding + len(row_order) * row_height + (len(row_order) - 1) * row_gap + 38
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
     draw = ImageDraw.Draw(canvas)
 
     try:
-        position_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 200)
-        name_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 64)
-        small_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 56)
-        badge_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 25)
-        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 34)
+        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        position_font = ImageFont.truetype(font_path, 200)
+        name_font = ImageFont.truetype(font_path, 80)
+        small_font = ImageFont.truetype(font_path, 72)
+        badge_font = ImageFont.truetype(font_path, 32)
+        title_font = ImageFont.truetype(font_path, 42)
     except OSError:
-        position_font = name_font = small_font = badge_font = title_font = ImageFont.load_default()
+        position_font = ImageFont.load_default(size=200)
+        name_font = ImageFont.load_default(size=80)
+        small_font = ImageFont.load_default(size=72)
+        badge_font = ImageFont.load_default(size=32)
+        title_font = ImageFont.load_default(size=42)
 
     # Pitch markings.
     draw.rectangle((14, 14, canvas_width - 14, canvas_height - 14), outline=(220, 242, 225), width=3)
@@ -220,7 +225,7 @@ async def player_lineup_image(request):
         count = len(row)
         total_width = count * card_width + max(0, count - 1) * gap_x
         # Center even a single player/card on the pitch.
-        start_x = (canvas_width - total_width) // 2 + 24
+        start_x = (canvas_width - total_width) // 2 - 12
         for index, slot in enumerate(row):
             x = start_x + index * (card_width + gap_x)
             card = slot.get("card")
