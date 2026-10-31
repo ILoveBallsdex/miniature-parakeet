@@ -295,7 +295,7 @@ class MultiSellView(discord.ui.View):
                 if card:
                     val = calculate_card_value(card)
                     total_value += val
-                    item_list.append(f"• **{card.name}** ({card.overall}) — {val:,} coins")
+                    item_list.append(f"• **{card.name}** ({card.overall}) - {val:,} coins")
             display_str = "\n".join(item_list[-10:])
             if len(item_list) > 10:
                 display_str += f"\n...and {len(item_list)-10} more"
