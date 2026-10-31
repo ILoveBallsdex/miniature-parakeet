@@ -266,19 +266,19 @@ async def player_lineup_image(request):
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
     draw = ImageDraw.Draw(canvas)
 
-    try:
-        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        position_font = ImageFont.truetype(font_path, 158)
-        name_font = ImageFont.truetype(font_path, 128)
-        small_font = ImageFont.truetype(font_path, 108)
-        badge_font = ImageFont.truetype(font_path, 140)
-        title_font = ImageFont.truetype(font_path, 130)
-    except OSError:
-        position_font = ImageFont.load_default(size=158)
-        name_font = ImageFont.load_default(size=128)
-        small_font = ImageFont.load_default(size=108)
-        badge_font = ImageFont.load_default(size=140)
-        title_font = ImageFont.load_default(size=130)
+    # Use Pillow's standard font lookup instead of a distro-specific absolute path.
+    # Some Railway images do not install DejaVu fonts under /usr/share/fonts.
+    def load_bold_font(size):
+        try:
+            return ImageFont.truetype("DejaVuSans-Bold.ttf", size)
+        except OSError:
+            return ImageFont.load_default(size=size)
+
+    position_font = load_bold_font(158)
+    name_font = load_bold_font(128)
+    small_font = load_bold_font(108)
+    badge_font = load_bold_font(140)
+    title_font = load_bold_font(130)
 
     # Pitch markings.
     draw.rectangle((14, 14, canvas_width - 14, canvas_height - 14), outline=(220, 242, 225), width=4)
@@ -403,7 +403,7 @@ async def player_lineup_image(request):
                     current_size = getattr(name_font_for_player, "size", 80)
                     if current_size <= 56:
                         break
-                    name_font_for_player = ImageFont.truetype(font_path, current_size - 9)
+                    name_font_for_player = load_bold_font(current_size - 9)
                 rating_label = f"{card.get('effective_overall', card.get('overall', '-'))} OVR"
             else:
                 name_label = "Empty"
