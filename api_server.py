@@ -1315,3 +1315,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Deployment verification: confirm Railway is running the latest GitHub revision.
