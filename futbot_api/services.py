@@ -836,14 +836,16 @@ def _resolve_battle_round(db, row, state):
         winner_id = p2_id
         state["p2_wins"] += 1
         result = f"Player {p2_id} wins with {stat}."
-    elif (p1_card["overall"] or 0) > (p2_card["overall"] or 0):
+    p1_effective = int(state.get("p1_effective_overall", {}).get(str(p1_card["card_id"]), p1_card["overall"] or 0))
+    p2_effective = int(state.get("p2_effective_overall", {}).get(str(p2_card["card_id"]), p2_card["overall"] or 0))
+    if p1_effective > p2_effective:
         winner_id = p1_id
         state["p1_wins"] += 1
-        result = f"Stats tied; player {p1_id} wins on overall."
-    elif (p2_card["overall"] or 0) > (p1_card["overall"] or 0):
+        result = f"Stats tied; player {p1_id} wins on effective overall ({p1_effective} vs {p2_effective})."
+    elif p2_effective > p1_effective:
         winner_id = p2_id
         state["p2_wins"] += 1
-        result = f"Stats tied; player {p2_id} wins on overall."
+        result = f"Stats tied; player {p2_id} wins on effective overall ({p2_effective} vs {p1_effective})."
     else:
         state["draws"] += 1
         result = "The round is a draw."
@@ -865,9 +867,15 @@ def _resolve_battle_round(db, row, state):
 
     state["p1_used"].append(p1_card["card_id"])
     state["p2_used"].append(p2_card["card_id"])
+    p1_result_card = dict(p1_card)
+    p2_result_card = dict(p2_card)
+    p1_result_card["position_penalty"] = int(state.get("p1_position_penalties", {}).get(str(p1_card["card_id"]), 0))
+    p2_result_card["position_penalty"] = int(state.get("p2_position_penalties", {}).get(str(p2_card["card_id"]), 0))
+    p1_result_card["effective_overall"] = p1_effective
+    p2_result_card["effective_overall"] = p2_effective
     state["last_result"] = {
         "text": result, "winner_id": winner_id,
-        "player1_card": dict(p1_card), "player2_card": dict(p2_card),
+        "player1_card": p1_result_card, "player2_card": p2_result_card,
         "player1_action": state["p1_action"], "player2_action": state["p2_action"],
         "stat": stat,
     }
