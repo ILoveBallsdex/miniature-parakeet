@@ -387,8 +387,8 @@ async def player_lineup_image(request):
                 x = canvas_width // 2 - card_width // 2
             if row_name == "att" and position == "CF":
                 y += 250
-            if row_name == "att" and position == "ST" and len(rows["def"]) == 4:
-                if formation_name == "4-1-2":
+            if row_name == "att" and position == "ST":
+                if len(rows["def"]) == 4 and formation_name == "4-1-2":
                     y += 200
                 elif formation_name == "3-2-2":
                     y += 300
