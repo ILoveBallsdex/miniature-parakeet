@@ -175,7 +175,7 @@ def resolve_asset_path(image_path):
         ("Jan Oblak", 89, 15, 93, 74, "GK", "Atletico Madrid", "La Liga", "Slovenia", "188"),
         ("William Saliba", 88, 45, 91, 84, "CB", "Arsenal", "Premier League", "France", "192"),
         ("Achraf Hakimi", 88, 78, 82, 94, "RB", "PSG", "Ligue 1", "Morocco", "181"),
-        ("Sonny? placeholder", 86, 75, 70, 80, "CM", "Borussia Dortmund", "Bundesliga", "Germany", "180"),
+        ("Niclas Fullkrug", 86, 75, 70, 80, "CM", "Borussia Dortmund", "Bundesliga", "Germany", "180"),
         ("Khvicha Kvaratskhelia", 87, 88, 45, 90, "LW", "PSG", "Ligue 1", "Georgia", "183"),
         # Icons and Heroes make their dedicated packs testable.
         ("Pele", 96, 98, 55, 94, "ST", "Icons", "Icon", "Brazil", "173", "Icon"),
