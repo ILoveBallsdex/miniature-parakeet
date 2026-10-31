@@ -199,7 +199,7 @@ async def player_lineup_image(request):
         badge_font = ImageFont.truetype(font_path, 32)
         title_font = ImageFont.truetype(font_path, 42)
     except OSError:
-        position_font = ImageFont.load_default(size=200)
+        position_font = ImageFont.load_default(size=50)
         name_font = ImageFont.load_default(size=80)
         small_font = ImageFont.load_default(size=72)
         badge_font = ImageFont.load_default(size=32)
