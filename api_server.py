@@ -317,7 +317,7 @@ async def player_lineup_image(request):
                 else:
                     row_y += 1000  # Keep the existing adjustment for other four-defender layouts.
             elif len(row) == 2 and formation_name == "2-2-3":
-                row_y += 1400  # Raise the 2-2-3 center-backs.
+                row_y += 1000  # Move the 2-2-3 center-backs further up.
             else:
                 row_y += 500 if len(row) == 3 else 1800
         elif row_name == "gk":
