@@ -129,79 +129,6 @@ async def card_detail(request):
 def resolve_asset_path(image_path):
     if not image_path:
         raise services.GameError("This card does not have an image path.", 404)
-    # A broad sample catalog for testing every pack tier. Ratings are custom game ratings.
-    extra_players = [
-        # Standard: low (70-79), mid (80-85), and high (86-95).
-        ("Jordan Pickford", 79, 20, 78, 70, "GK", "Everton", "Premier League", "England", "185"),
-        ("Harry Maguire", 77, 48, 79, 55, "CB", "Manchester United", "Premier League", "England", "194"),
-        ("Mason Mount", 78, 76, 65, 78, "CM", "Manchester United", "Premier League", "England", "181"),
-        ("Christian Pulisic", 79, 78, 45, 86, "LW", "AC Milan", "Serie A", "USA", "177"),
-        ("Kai Havertz", 78, 76, 62, 73, "ST", "Arsenal", "Premier League", "Germany", "193"),
-        ("Antony", 74, 72, 35, 82, "RW", "Real Betis", "La Liga", "Brazil", "174"),
-        ("Richarlison", 77, 78, 48, 75, "ST", "Tottenham", "Premier League", "Brazil", "184"),
-        ("Mason Greenwood", 79, 80, 38, 82, "RW", "Marseille", "Ligue 1", "England", "181"),
-        ("Cody Gakpo", 79, 80, 48, 79, "LW", "Liverpool", "Premier League", "Netherlands", "193"),
-        ("Nicolas Jackson", 76, 77, 35, 83, "ST", "Chelsea", "Premier League", "Senegal", "187"),
-        ("Jadon Sancho", 78, 78, 35, 85, "LW", "Chelsea", "Premier League", "England", "180"),
-        ("Joao Felix", 79, 80, 42, 82, "CF", "Chelsea", "Premier League", "Portugal", "181"),
-        ("Alexis Mac Allister", 79, 75, 72, 72, "CM", "Liverpool", "Premier League", "Argentina", "176"),
-        ("Rasmus Hojlund", 77, 78, 40, 82, "ST", "Manchester United", "Premier League", "Denmark", "191"),
-        ("Dominik Szoboszlai", 79, 78, 68, 83, "CM", "Liverpool", "Premier League", "Hungary", "186"),
-        ("Ollie Watkins", 84, 86, 45, 84, "ST", "Aston Villa", "Premier League", "England", "180"),
-        ("Declan Rice", 85, 70, 85, 78, "CDM", "Arsenal", "Premier League", "England", "188"),
-        ("Bruno Fernandes", 85, 88, 70, 75, "CAM", "Manchester United", "Premier League", "Portugal", "179"),
-        ("Lautaro Martinez", 85, 88, 48, 83, "ST", "Inter Milan", "Serie A", "Argentina", "174"),
-        ("Federico Valverde", 85, 82, 82, 90, "CM", "Real Madrid", "La Liga", "Uruguay", "182"),
-        ("Son Heung-min", 85, 88, 42, 86, "LW", "Tottenham", "Premier League", "South Korea", "183"),
-        ("Bernardo Silva", 85, 82, 70, 78, "CAM", "Manchester City", "Premier League", "Portugal", "173"),
-        ("Rodri", 85, 70, 88, 65, "CDM", "Manchester City", "Premier League", "Spain", "191"),
-        ("Rafael Leao", 84, 86, 40, 91, "LW", "AC Milan", "Serie A", "Portugal", "188"),
-        ("Victor Osimhen", 84, 88, 42, 87, "ST", "Galatasaray", "Super Lig", "Nigeria", "186"),
-        ("Bukayo Saka", 88, 90, 62, 88, "RW", "Arsenal", "Premier League", "England", "178"),
-        ("Erling Haaland", 91, 96, 45, 89, "ST", "Manchester City", "Premier League", "Norway", "195"),
-        ("Kevin De Bruyne", 91, 94, 70, 75, "CM", "Manchester City", "Premier League", "Belgium", "181"),
-        ("Harry Kane", 90, 95, 50, 72, "ST", "Bayern Munich", "Bundesliga", "England", "188"),
-        ("Robert Lewandowski", 89, 94, 45, 78, "ST", "Barcelona", "La Liga", "Poland", "185"),
-        ("Virgil van Dijk", 90, 65, 94, 78, "CB", "Liverpool", "Premier League", "Netherlands", "193"),
-        ("Alisson Becker", 89, 20, 90, 82, "GK", "Liverpool", "Premier League", "Brazil", "193"),
-        ("Thibaut Courtois", 90, 18, 92, 75, "GK", "Real Madrid", "La Liga", "Belgium", "200"),
-        ("Rodrygo", 87, 88, 40, 90, "RW", "Real Madrid", "La Liga", "Brazil", "174"),
-        ("Phil Foden", 88, 89, 55, 87, "CAM", "Manchester City", "Premier League", "England", "171"),
-        ("Lamine Yamal", 88, 90, 35, 94, "RW", "Barcelona", "La Liga", "Spain", "180"),
-        ("Pedri", 87, 82, 70, 78, "CM", "Barcelona", "La Liga", "Spain", "174"),
-        ("Jamal Musiala", 89, 91, 55, 90, "CAM", "Bayern Munich", "Bundesliga", "Germany", "184"),
-        ("Florian Wirtz", 88, 90, 58, 85, "CAM", "Bayer Leverkusen", "Bundesliga", "Germany", "177"),
-        ("Antoine Griezmann", 87, 89, 62, 80, "CF", "Atletico Madrid", "La Liga", "France", "176"),
-        ("Jan Oblak", 89, 15, 93, 74, "GK", "Atletico Madrid", "La Liga", "Slovenia", "188"),
-        ("William Saliba", 88, 45, 91, 84, "CB", "Arsenal", "Premier League", "France", "192"),
-        ("Achraf Hakimi", 88, 78, 82, 94, "RB", "PSG", "Ligue 1", "Morocco", "181"),
-        ("Niclas Fullkrug", 86, 75, 70, 80, "CM", "Borussia Dortmund", "Bundesliga", "Germany", "180"),
-        ("Khvicha Kvaratskhelia", 87, 88, 45, 90, "LW", "PSG", "Ligue 1", "Georgia", "183"),
-        # Icons and Heroes make their dedicated packs testable.
-        ("Pele", 96, 98, 55, 94, "ST", "Icons", "Icon", "Brazil", "173", "Icon"),
-        ("Diego Maradona", 95, 97, 42, 91, "CAM", "Icons", "Icon", "Argentina", "165", "Icon"),
-        ("Zinedine Zidane", 95, 94, 78, 82, "CAM", "Icons", "Icon", "France", "185", "Icon"),
-        ("Ronaldinho", 94, 96, 48, 92, "LW", "Icons", "Icon", "Brazil", "181", "Icon"),
-        ("Ronaldo Nazario", 96, 98, 45, 95, "ST", "Icons", "Icon", "Brazil", "183", "Icon"),
-        ("Johan Cruyff", 94, 94, 55, 90, "CF", "Icons", "Icon", "Netherlands", "180", "Icon"),
-        ("Didier Drogba", 91, 93, 60, 82, "ST", "Heroes", "Hero", "Ivory Coast", "189", "Hero"),
-        ("David Ginola", 90, 89, 48, 88, "LW", "Heroes", "Hero", "France", "185", "Hero"),
-        ("Yaya Toure", 91, 88, 82, 83, "CM", "Heroes", "Hero", "Ivory Coast", "188", "Hero"),
-        ("Sonia Bompastor", 89, 78, 82, 87, "LB", "Heroes", "Hero", "France", "162", "Hero"),
-        ("Javier Mascherano", 90, 65, 91, 78, "CDM", "Heroes", "Hero", "Argentina", "174", "Hero"),
-        ("Landon Donovan", 89, 87, 55, 89, "CF", "Heroes", "Hero", "USA", "173", "Hero"),
-    ]
-    for offset, entry in enumerate(extra_players):
-        name, overall, attack, defense, speed, position, club, league, nation, height, *kind = entry
-        card_type = kind[0] if kind else "Standard"
-        card_id = 10100 + offset
-        test_cards.append({
-            "card_id": card_id, "name": name, "attack": attack, "defense": defense,
-            "speed": speed, "overall": overall, "card_rarity": "Legendary" if card_type == "Icon" else "Hero" if card_type == "Hero" else "Common" if overall < 80 else "Uncommon" if overall < 86 else "Rare",
-            "card_type": card_type, "height": height, "club": club, "position": position,
-            "league": league, "nation": nation,
-        })
-
     asset_root = Path(os.getenv("FUTBOT_ASSET_DIR", ".")).expanduser().resolve()
     candidate = Path(image_path)
     if not candidate.is_absolute():
@@ -1066,6 +993,80 @@ def seed_test_cards():
         {"card_id": 10005, "name": "Ruben Dias", "attack": 50, "defense": 95, "speed": 76, "overall": 93, "card_rarity": "Rare", "card_type": "Standard", "height": "187", "club": "Manchester City", "position": "CB", "league": "Premier League", "nation": "Portugal"},
         {"card_id": 10006, "name": "Mohamed Salah", "attack": 96, "defense": 45, "speed": 91, "overall": 93, "card_rarity": "Rare", "card_type": "Standard", "height": "175", "club": "Liverpool", "position": "RW", "league": "Premier League", "nation": "Egypt"},
     ]
+
+    # A broad sample catalog for testing every pack tier. Ratings are custom game ratings.
+    extra_players = [
+        # Standard: low (70-79), mid (80-85), and high (86-95).
+        ("Jordan Pickford", 79, 20, 78, 70, "GK", "Everton", "Premier League", "England", "185"),
+        ("Harry Maguire", 77, 48, 79, 55, "CB", "Manchester United", "Premier League", "England", "194"),
+        ("Mason Mount", 78, 76, 65, 78, "CM", "Manchester United", "Premier League", "England", "181"),
+        ("Christian Pulisic", 79, 78, 45, 86, "LW", "AC Milan", "Serie A", "USA", "177"),
+        ("Kai Havertz", 78, 76, 62, 73, "ST", "Arsenal", "Premier League", "Germany", "193"),
+        ("Antony", 74, 72, 35, 82, "RW", "Real Betis", "La Liga", "Brazil", "174"),
+        ("Richarlison", 77, 78, 48, 75, "ST", "Tottenham", "Premier League", "Brazil", "184"),
+        ("Mason Greenwood", 79, 80, 38, 82, "RW", "Marseille", "Ligue 1", "England", "181"),
+        ("Cody Gakpo", 79, 80, 48, 79, "LW", "Liverpool", "Premier League", "Netherlands", "193"),
+        ("Nicolas Jackson", 76, 77, 35, 83, "ST", "Chelsea", "Premier League", "Senegal", "187"),
+        ("Jadon Sancho", 78, 78, 35, 85, "LW", "Chelsea", "Premier League", "England", "180"),
+        ("Joao Felix", 79, 80, 42, 82, "CF", "Chelsea", "Premier League", "Portugal", "181"),
+        ("Alexis Mac Allister", 79, 75, 72, 72, "CM", "Liverpool", "Premier League", "Argentina", "176"),
+        ("Rasmus Hojlund", 77, 78, 40, 82, "ST", "Manchester United", "Premier League", "Denmark", "191"),
+        ("Dominik Szoboszlai", 79, 78, 68, 83, "CM", "Liverpool", "Premier League", "Hungary", "186"),
+        ("Ollie Watkins", 84, 86, 45, 84, "ST", "Aston Villa", "Premier League", "England", "180"),
+        ("Declan Rice", 85, 70, 85, 78, "CDM", "Arsenal", "Premier League", "England", "188"),
+        ("Bruno Fernandes", 85, 88, 70, 75, "CAM", "Manchester United", "Premier League", "Portugal", "179"),
+        ("Lautaro Martinez", 85, 88, 48, 83, "ST", "Inter Milan", "Serie A", "Argentina", "174"),
+        ("Federico Valverde", 85, 82, 82, 90, "CM", "Real Madrid", "La Liga", "Uruguay", "182"),
+        ("Son Heung-min", 85, 88, 42, 86, "LW", "Tottenham", "Premier League", "South Korea", "183"),
+        ("Bernardo Silva", 85, 82, 70, 78, "CAM", "Manchester City", "Premier League", "Portugal", "173"),
+        ("Rodri", 85, 70, 88, 65, "CDM", "Manchester City", "Premier League", "Spain", "191"),
+        ("Rafael Leao", 84, 86, 40, 91, "LW", "AC Milan", "Serie A", "Portugal", "188"),
+        ("Victor Osimhen", 84, 88, 42, 87, "ST", "Galatasaray", "Super Lig", "Nigeria", "186"),
+        ("Bukayo Saka", 88, 90, 62, 88, "RW", "Arsenal", "Premier League", "England", "178"),
+        ("Erling Haaland", 91, 96, 45, 89, "ST", "Manchester City", "Premier League", "Norway", "195"),
+        ("Kevin De Bruyne", 91, 94, 70, 75, "CM", "Manchester City", "Premier League", "Belgium", "181"),
+        ("Harry Kane", 90, 95, 50, 72, "ST", "Bayern Munich", "Bundesliga", "England", "188"),
+        ("Robert Lewandowski", 89, 94, 45, 78, "ST", "Barcelona", "La Liga", "Poland", "185"),
+        ("Virgil van Dijk", 90, 65, 94, 78, "CB", "Liverpool", "Premier League", "Netherlands", "193"),
+        ("Alisson Becker", 89, 20, 90, 82, "GK", "Liverpool", "Premier League", "Brazil", "193"),
+        ("Thibaut Courtois", 90, 18, 92, 75, "GK", "Real Madrid", "La Liga", "Belgium", "200"),
+        ("Rodrygo", 87, 88, 40, 90, "RW", "Real Madrid", "La Liga", "Brazil", "174"),
+        ("Phil Foden", 88, 89, 55, 87, "CAM", "Manchester City", "Premier League", "England", "171"),
+        ("Lamine Yamal", 88, 90, 35, 94, "RW", "Barcelona", "La Liga", "Spain", "180"),
+        ("Pedri", 87, 82, 70, 78, "CM", "Barcelona", "La Liga", "Spain", "174"),
+        ("Jamal Musiala", 89, 91, 55, 90, "CAM", "Bayern Munich", "Bundesliga", "Germany", "184"),
+        ("Florian Wirtz", 88, 90, 58, 85, "CAM", "Bayer Leverkusen", "Bundesliga", "Germany", "177"),
+        ("Antoine Griezmann", 87, 89, 62, 80, "CF", "Atletico Madrid", "La Liga", "France", "176"),
+        ("Jan Oblak", 89, 15, 93, 74, "GK", "Atletico Madrid", "La Liga", "Slovenia", "188"),
+        ("William Saliba", 88, 45, 91, 84, "CB", "Arsenal", "Premier League", "France", "192"),
+        ("Achraf Hakimi", 88, 78, 82, 94, "RB", "PSG", "Ligue 1", "Morocco", "181"),
+        ("Niclas Fullkrug", 86, 75, 70, 80, "CM", "Borussia Dortmund", "Bundesliga", "Germany", "180"),
+        ("Khvicha Kvaratskhelia", 87, 88, 45, 90, "LW", "PSG", "Ligue 1", "Georgia", "183"),
+        # Icons and Heroes make their dedicated packs testable.
+        ("Pele", 96, 98, 55, 94, "ST", "Icons", "Icon", "Brazil", "173", "Icon"),
+        ("Diego Maradona", 95, 97, 42, 91, "CAM", "Icons", "Icon", "Argentina", "165", "Icon"),
+        ("Zinedine Zidane", 95, 94, 78, 82, "CAM", "Icons", "Icon", "France", "185", "Icon"),
+        ("Ronaldinho", 94, 96, 48, 92, "LW", "Icons", "Icon", "Brazil", "181", "Icon"),
+        ("Ronaldo Nazario", 96, 98, 45, 95, "ST", "Icons", "Icon", "Brazil", "183", "Icon"),
+        ("Johan Cruyff", 94, 94, 55, 90, "CF", "Icons", "Icon", "Netherlands", "180", "Icon"),
+        ("Didier Drogba", 91, 93, 60, 82, "ST", "Heroes", "Hero", "Ivory Coast", "189", "Hero"),
+        ("David Ginola", 90, 89, 48, 88, "LW", "Heroes", "Hero", "France", "185", "Hero"),
+        ("Yaya Toure", 91, 88, 82, 83, "CM", "Heroes", "Hero", "Ivory Coast", "188", "Hero"),
+        ("Sonia Bompastor", 89, 78, 82, 87, "LB", "Heroes", "Hero", "France", "162", "Hero"),
+        ("Javier Mascherano", 90, 65, 91, 78, "CDM", "Heroes", "Hero", "Argentina", "174", "Hero"),
+        ("Landon Donovan", 89, 87, 55, 89, "CF", "Heroes", "Hero", "USA", "173", "Hero"),
+    ]
+    for offset, entry in enumerate(extra_players):
+        name, overall, attack, defense, speed, position, club, league, nation, height, *kind = entry
+        card_type = kind[0] if kind else "Standard"
+        card_id = 10100 + offset
+        test_cards.append({
+            "card_id": card_id, "name": name, "attack": attack, "defense": defense,
+            "speed": speed, "overall": overall, "card_rarity": "Legendary" if card_type == "Icon" else "Hero" if card_type == "Hero" else "Common" if overall < 80 else "Uncommon" if overall < 86 else "Rare",
+            "card_type": card_type, "height": height, "club": club, "position": position,
+            "league": league, "nation": nation,
+        })
+
 
     asset_root = Path(os.getenv("FUTBOT_ASSET_DIR", ".")).expanduser().resolve()
     card_dir = asset_root / "cards"
