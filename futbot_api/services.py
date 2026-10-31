@@ -363,7 +363,6 @@ def quicksell_card(user_id: int, card_id: int):
 
 def _match_card_name(rows, player_name):
     """Match a player name exactly, by a clear partial name, or with a small typo."""
-    import difflib
     import re
 
     query = " ".join(str(player_name or "").lower().split())
