@@ -5,7 +5,9 @@ This service owns FutBot game data and rules. It deliberately does not import
 bot.py, create a Discord client, or require a Discord bot token.
 """
 
+import hashlib
 import hmac
+import time
 import logging
 import asyncio
 import base64
@@ -31,7 +33,9 @@ logger = logging.getLogger("futbot.api")
 
 @web.middleware
 async def api_key_middleware(request: web.Request, handler):
-    if request.path == "/health":
+    if request.path == "/health" or (
+        request.method == "GET" and request.path.startswith("/public/lineups/")
+    ):
         return await handler(request)
 
     expected_key = request.app["api_key"]
@@ -185,6 +189,35 @@ async def card_image(request):
     if card is None:
         raise services.GameError("Card not found.", 404)
     return web.FileResponse(resolve_asset_path(card.get("image_path")))
+
+
+async def public_player_lineup_image(request):
+    user_id = int(request.match_info["user_id"])
+    try:
+        expires = int(request.query.get("expires", "0"))
+    except ValueError:
+        raise web.HTTPForbidden(text="Invalid image link.")
+
+    now = int(time.time())
+    if expires < now or expires > now + 8 * 24 * 60 * 60:
+        raise web.HTTPForbidden(text="This image link has expired.")
+
+    supplied_signature = request.query.get("sig", "")
+    message = f"{user_id}:{expires}".encode("utf-8")
+    expected_signature = hmac.new(
+        request.app["api_key"].encode("utf-8"),
+        message,
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not supplied_signature or not hmac.compare_digest(
+        supplied_signature, expected_signature
+    ):
+        raise web.HTTPForbidden(text="Invalid image link.")
+
+    response = await player_lineup_image(request)
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return response
 
 
 async def player_lineup_image(request):
@@ -1167,6 +1200,10 @@ def create_app(api_key: str) -> web.Application:
     app["api_key"] = api_key
 
     app.router.add_get("/health", health)
+    app.router.add_get(
+        "/public/lineups/{user_id:\\d+}/image",
+        public_player_lineup_image,
+    )
     app.router.add_get("/api/v1/status", status)
     app.router.add_get("/api/v1/cards", card_list)
     app.router.add_get("/api/v1/cards/lookup", card_lookup)
