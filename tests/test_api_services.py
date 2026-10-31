@@ -131,10 +131,8 @@ class FutBotServiceTests(unittest.TestCase):
             "2-2-3": ["GK", "CB", "CB", "CM", "CM", "LW", "ST", "RW"],
             "2-3-2": ["GK", "CB", "CB", "CM", "CAM", "CM", "ST", "CF"],
             "2-4-1": ["GK", "CB", "CB", "CM", "CM", "CDM", "CAM", "ST"],
-            "2-1-4": ["GK", "CB", "CB", "CM", "LW", "ST", "CF", "RW"],
             "3-2-2": ["GK", "LB", "CB", "RB", "CM", "CM", "ST", "CF"],
             "3-3-1": ["GK", "LB", "CB", "RB", "CM", "CM", "CAM", "ST"],
-            "3-1-3": ["GK", "LB", "CB", "RB", "CM", "LW", "ST", "RW"],
             "4-2-1": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "ST"],
             "4-1-2": ["GK", "LB", "CB", "CB", "RB", "CM", "ST", "CF"],
         }
@@ -144,8 +142,11 @@ class FutBotServiceTests(unittest.TestCase):
             self.assertEqual(positions.count("GK"), 1, name)
             defenders = sum(position in {"LB", "CB", "RB"} for position in positions)
             self.assertIn(defenders, (2, 3, 4), name)
-            self.assertGreaterEqual(positions.count("CM"), 1, name)
-            self.assertGreaterEqual(sum(position in {"LW", "ST", "RW", "CF"} for position in positions), 1, name)
+            midfielders = sum(position in {"CM", "CAM", "CDM"} for position in positions)
+            attackers = sum(position in {"LW", "ST", "RW", "CF"} for position in positions)
+            self.assertGreaterEqual(midfielders * 2, attackers, name)
+            self.assertGreaterEqual(midfielders, 1, name)
+            self.assertGreaterEqual(attackers, 1, name)
             self.assertFalse(set(positions) & {"LCB", "RCB", "LWB", "RWB", "LM", "RM"})
 
     def test_legacy_wide_and_center_back_positions_match_standard_slots(self):
