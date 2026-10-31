@@ -21,15 +21,13 @@ class GameError(Exception):
 
 
 def card_value(overall: int) -> int:
-    if overall >= 90: return 200
-    if overall >= 85: return 150
-    if overall >= 80: return 100
-    if overall >= 75: return 50
-    return 25
+    """Return a smoothly scaling player value, starting at 1,000 coins for 60 OVR."""
+    overall = int(overall or 0)
+    return max(1, round(1000 * (1.10 ** (overall - 60))))
 
 
 def quicksell_value(overall: int) -> int:
-    """Return half of the card's catalog value, rounded down to whole coins."""
+    """Return half of the card's overall-based value, rounded down to whole coins."""
     return card_value(overall) // 2
 
 
