@@ -129,13 +129,23 @@ class FutBotServiceTests(unittest.TestCase):
     def test_formations_use_only_standard_defensive_slots(self):
         expected = {
             "2-2-3": ["GK", "CB", "CB", "CM", "CM", "LW", "ST", "RW"],
-            "3-2-2": ["GK", "CB", "LB", "RB", "CM", "CM", "ST", "CF"],
-            "2-3-2": ["GK", "CB", "CB", "CM", "CM", "CAM", "ST", "CF"],
+            "2-3-2": ["GK", "CB", "CB", "CM", "CAM", "CM", "ST", "CF"],
+            "2-4-1": ["GK", "CB", "CB", "CM", "CM", "CDM", "CAM", "ST"],
+            "2-1-4": ["GK", "CB", "CB", "CM", "LW", "ST", "CF", "RW"],
+            "3-2-2": ["GK", "LB", "CB", "RB", "CM", "CM", "ST", "CF"],
+            "3-3-1": ["GK", "LB", "CB", "RB", "CM", "CM", "CAM", "ST"],
+            "3-1-3": ["GK", "LB", "CB", "RB", "CM", "LW", "ST", "RW"],
             "4-2-1": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "ST"],
-            "3-3-1": ["GK", "CB", "LB", "RB", "CM", "CM", "CAM", "ST"],
+            "4-1-2": ["GK", "LB", "CB", "CB", "RB", "CM", "ST", "CF"],
         }
         self.assertEqual(services.FORMATIONS, expected)
-        for positions in services.FORMATIONS.values():
+        for name, positions in services.FORMATIONS.items():
+            self.assertEqual(len(positions), 8, name)
+            self.assertEqual(positions.count("GK"), 1, name)
+            defenders = sum(position in {"LB", "CB", "RB"} for position in positions)
+            self.assertIn(defenders, (2, 3, 4), name)
+            self.assertGreaterEqual(positions.count("CM"), 1, name)
+            self.assertGreaterEqual(sum(position in {"LW", "ST", "RW", "CF"} for position in positions), 1, name)
             self.assertFalse(set(positions) & {"LCB", "RCB", "LWB", "RWB", "LM", "RM"})
 
     def test_legacy_wide_and_center_back_positions_match_standard_slots(self):
