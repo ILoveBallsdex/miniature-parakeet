@@ -194,10 +194,10 @@ async def player_lineup_image(request):
     from PIL import Image, ImageDraw, ImageFont, ImageOps
 
     # Keep the same near-2:3 portrait ratio Discord displayed larger before, with larger cards.
-    card_width, card_height = 900, 1260
-    label_height = 540
-    gap_x, padding_x = 300, 150
-    row_gap, top_padding = 0, 440
+    card_width, card_height = 1500, 2100
+    label_height = 300
+    gap_x, padding_x = 200, 100
+    row_gap, top_padding = 0, 300
     row_order = ("att", "cam", "mid", "cdm", "def", "gk")
     position_rows = {
         "GK": "gk",
@@ -225,31 +225,31 @@ async def player_lineup_image(request):
             rows[row_name].sort(key=lambda item: int(item["slot"]))
 
     # Keep a 2:3 image ratio for Discord while giving each card much more space.
-    canvas_width = 7200
-    canvas_height = 11250
+    canvas_width = 9500
+    canvas_height = 14800
     row_height = card_height + label_height
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
     draw = ImageDraw.Draw(canvas)
 
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        position_font = ImageFont.truetype(font_path, 180)
-        name_font = ImageFont.truetype(font_path, 135)
-        small_font = ImageFont.truetype(font_path, 115)
+        position_font = ImageFont.truetype(font_path, 200)
+        name_font = ImageFont.truetype(font_path, 170)
+        small_font = ImageFont.truetype(font_path, 130)
         badge_font = ImageFont.truetype(font_path, 150)
         title_font = ImageFont.truetype(font_path, 180)
     except OSError:
-        position_font = ImageFont.load_default(size=180)
-        name_font = ImageFont.load_default(size=135)
-        small_font = ImageFont.load_default(size=115)
+        position_font = ImageFont.load_default(size=200)
+        name_font = ImageFont.load_default(size=170)
+        small_font = ImageFont.load_default(size=130)
         badge_font = ImageFont.load_default(size=150)
         title_font = ImageFont.load_default(size=180)
 
     # Pitch markings.
     draw.rectangle((14, 14, canvas_width - 14, canvas_height - 14), outline=(220, 242, 225), width=4)
     draw.line((14, canvas_height // 2, canvas_width - 14, canvas_height // 2), fill=(220, 242, 225), width=3)
-    draw.ellipse((canvas_width // 2 - 100, canvas_height // 2 - 100,
-                  canvas_width // 2 + 100, canvas_height // 2 + 100), outline=(220, 242, 225), width=3)
+    draw.ellipse((canvas_width // 2 - 130, canvas_height // 2 - 130,
+                  canvas_width // 2 + 130, canvas_height // 2 + 130), outline=(220, 242, 225), width=3)
     draw.rectangle((canvas_width // 2 - 240, 14, canvas_width // 2 + 240, 155),
                    outline=(220, 242, 225), width=2)
     draw.rectangle((canvas_width // 2 - 240, canvas_height - 155,
