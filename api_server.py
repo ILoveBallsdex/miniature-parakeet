@@ -486,6 +486,19 @@ async def open_pack(request):
     return success(services.open_pack(user_id, pack_id))
 
 
+
+
+async def open_player_pack(request):
+    user_id = int(request.match_info["user_id"])
+    payload = await read_json(request)
+    tier = str(payload.get("tier", "")).lower()
+    try:
+        size = int(payload["size"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("size must be 2, 5, or 10.")
+    return success(services.open_player_pack(user_id, tier, size))
+
+
 async def sell_cards(request):
     payload = await read_json(request)
     try:
@@ -1220,6 +1233,7 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_get("/api/v1/packs/catalog", pack_catalog)
     app.router.add_post("/api/v1/packs/buy", buy_pack)
     app.router.add_post("/api/v1/packs/open", open_pack)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/packs/open", open_player_pack)
     app.router.add_post("/api/v1/inventory/sell", sell_cards)
     return app
 
