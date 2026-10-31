@@ -276,7 +276,7 @@ async def player_lineup_image(request):
 
     position_font = load_bold_font(158)
     small_font = load_bold_font(108)  # Used for the lineup player-count subtitle.
-    badge_font = load_bold_font(200)
+    badge_font = load_bold_font(120)
     title_font = load_bold_font(130)
 
     # Pitch markings.
@@ -370,17 +370,35 @@ async def player_lineup_image(request):
                     canvas.paste(card_image, (x, y))
                     penalty = int(card.get("position_penalty") or 0)
                     if penalty > 0:
+                        # Draw the penalty as a small chat bubble extending
+                        # from the card's top-right edge, not over the artwork.
                         badge_text = f"-{penalty}"
                         bounds = draw.textbbox((0, 0), badge_text, font=badge_font)
-                        badge_w = bounds[2] - bounds[0] + 190
-                        badge_h = bounds[3] - bounds[1] + 150
-                        bx, by = x + card_width - badge_w - 13, y + 13
-                        draw.rounded_rectangle((bx, by, bx + badge_w, by + badge_h),
-                                               radius=58, fill=(210, 25, 38),
-                                               outline=(255, 255, 255), width=18)
-                        draw.text((bx + 95, by + 72), badge_text,
-                                  font=badge_font, fill=(255, 255, 255),
-                                  stroke_width=1, stroke_fill=(120, 0, 0))
+                        text_w = bounds[2] - bounds[0]
+                        text_h = bounds[3] - bounds[1]
+                        badge_w = text_w + 76
+                        badge_h = text_h + 52
+                        bx, by = x + card_width - 55, y + 34
+                        draw.polygon(
+                            [(bx + 28, by + badge_h - 8),
+                             (bx + 8, by + badge_h + 16),
+                             (bx + 66, by + badge_h - 8)],
+                            fill=(25, 25, 30),
+                        )
+                        draw.rounded_rectangle(
+                            (bx, by, bx + badge_w, by + badge_h),
+                            radius=42,
+                            fill=(25, 25, 30),
+                            outline=(255, 255, 255),
+                            width=10,
+                        )
+                        draw.text(
+                            (bx + (badge_w - text_w) // 2 - bounds[0],
+                             by + (badge_h - text_h) // 2 - bounds[1]),
+                            badge_text,
+                            font=badge_font,
+                            fill=(255, 255, 255),
+                        )
                 except Exception:
                     card = None
             else:
