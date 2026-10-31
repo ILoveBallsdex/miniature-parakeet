@@ -360,6 +360,98 @@ def quicksell_card(user_id: int, card_id: int):
     }
 
 
+
+def _match_card_name(rows, player_name):
+    """Match a player name exactly, by a clear partial name, or with a small typo."""
+    import difflib
+    import re
+
+    query = " ".join(str(player_name or "").lower().split())
+    if len(query) < 2:
+        raise GameError("Enter at least two letters of the player's name.")
+    normalize = lambda value: re.sub(r"[^a-z0-9 ]", "", " ".join(str(value or "").lower().split()))
+    normalized_query = normalize(query)
+    exact = [row for row in rows if normalize(row["name"]) == normalized_query]
+    if exact:
+        return exact[0]
+
+    partial = [row for row in rows if normalized_query in normalize(row["name"])]
+    if len(partial) == 1:
+        return partial[0]
+    if len(partial) > 1:
+        names = list(dict.fromkeys(str(row["name"]) for row in partial))
+        raise GameError("That name matches multiple players: " + ", ".join(names[:8]) + ". Type more of the name.")
+
+    # Compare against full names and individual name parts. Keep the threshold
+    # high so unrelated or random text is not treated as a player name.
+    max_edits = 1 if len(normalized_query.replace(" ", "")) <= 7 else 2
+    scored = []
+    for row in rows:
+        candidate = normalize(row["name"])
+        choices = [candidate, *candidate.split()]
+        best = max((difflib.SequenceMatcher(None, normalized_query, part).ratio() for part in choices), default=0)
+        if abs(len(normalized_query) - len(candidate)) <= max_edits or any(
+            abs(len(normalized_query) - len(part)) <= max_edits for part in candidate.split()
+        ):
+            if best >= 0.78:
+                scored.append((best, row))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    if not scored:
+        raise GameError("I couldn't find a player matching that name. Check the spelling and try again.", 404)
+    if len(scored) > 1 and scored[0][0] - scored[1][0] < 0.06:
+        names = list(dict.fromkeys(str(item[1]["name"]) for item in scored[:5]))
+        raise GameError("That could match multiple players: " + ", ".join(names) + ". Type more of the name.")
+    return scored[0][1]
+
+
+def find_catalog_card(player_name: str):
+    with read_connection() as db:
+        rows = db.execute("SELECT * FROM cards ORDER BY overall DESC, name ASC").fetchall()
+    if not rows:
+        raise GameError("The player catalog is empty.", 404)
+    card = _match_card_name(rows, player_name)
+    return {**dict(card), "value": card_value(card["overall"] or 0),
+            "quicksell_value": quicksell_value(card["overall"] or 0)}
+
+
+def find_owned_card(user_id: int, player_name: str):
+    with read_connection() as db:
+        rows = db.execute(
+            """SELECT c.*, i.rowid AS inventory_row_id, i.edition
+            FROM inventories i JOIN cards c ON c.card_id = i.card_id
+            WHERE i.user_id = ? ORDER BY c.overall DESC, c.name ASC""",
+            (user_id,),
+        ).fetchall()
+    if not rows:
+        raise GameError("You don't own any players yet.", 404)
+    return dict(_match_card_name(rows, player_name))
+
+
+def buy_player_card(user_id: int, card_id: int):
+    """Buy one catalog card for its full value and add it to the player's inventory."""
+    with transaction() as db:
+        player = db.execute("SELECT coins FROM players WHERE user_id = ?", (user_id,)).fetchone()
+        if player is None:
+            raise GameError("Player not found. Create the player first.", 404)
+        card = db.execute("SELECT * FROM cards WHERE card_id = ?", (card_id,)).fetchone()
+        if card is None:
+            raise GameError("Player card not found.", 404)
+        cost = card_value(card["overall"] or 0)
+        if int(player["coins"] or 0) < cost:
+            raise GameError("You don't have enough coins to buy this player.", 409)
+        edition_row = db.execute(
+            "SELECT COALESCE(copies, 0) + 1 AS edition FROM cards WHERE card_id = ?",
+            (card_id,),
+        ).fetchone()
+        edition = int(edition_row["edition"])
+        db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card_id,))
+        db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)",
+                   (user_id, card_id, edition))
+        db.execute("UPDATE players SET coins = COALESCE(coins, 0) - ? WHERE user_id = ?", (cost, user_id))
+        balance = db.execute("SELECT coins FROM players WHERE user_id = ?", (user_id,)).fetchone()["coins"]
+    return {**dict(card), "value": cost, "quicksell_value": quicksell_value(card["overall"] or 0),
+            "coins_spent": cost, "balance": balance, "edition": edition}
+
 def toggle_wishlist(user_id: int, card_id: int):
     with transaction() as db:
         if not db.execute("SELECT 1 FROM cards WHERE card_id = ?", (card_id,)).fetchone():
