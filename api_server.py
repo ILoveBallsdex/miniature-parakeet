@@ -159,7 +159,7 @@ async def player_lineup_image(request):
     card_width, card_height = 420, 588
     label_height = 460
     # Keep teammates in the same row far enough apart that their labels never collide.
-    gap_x, padding_x = 190, 120
+    gap_x, padding_x = 320, 220
     row_gap, top_padding = 48, 92
     row_order = ("att", "mid", "def", "gk")
     position_rows = {
