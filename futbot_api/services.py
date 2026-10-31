@@ -64,23 +64,42 @@ CARD_INTEGER_FIELDS = {"attack", "defense", "speed", "shooting", "passing", "dri
 
 
 def calculate_overall(position: str, shooting=0, passing=0, dribbling=0, defense=0, goalkeeping=0) -> int:
-    """Calculate OVR using the simple position-group formulas."""
+    """Estimate FIFA-style OVR from the four available outfield face stats.
+
+    EA's full calculation is not public and uses more underlying attributes.
+    These position weights are a four-stat approximation, with missing pace
+    and physicality removed and the remaining weights normalized.
+    """
     position = str(position or "").upper()
     if position == "GK":
         return int(round(float(goalkeeping or 0)))
 
-    total = sum(float(value or 0) for value in (shooting, dribbling, passing, defense))
-    attackers = {"ST", "CF", "LW", "RW"}
-    midfielders = {"CAM", "CM", "CDM", "LM", "RM"}
-    defenders = {"LB", "RB", "LWB", "RWB", "CB", "LCB", "RCB"}
-
-    if position in attackers:
-        return int(round(total / 3))
-    if position in defenders:
-        import math
-        return int(math.ceil(total / 2.5))
-    # Midfielders and any unlisted outfield position use the midfield formula.
-    return int(round(total / 4))
+    # Weights are ordered SHO, PAS, DRI, DEF and sum to 1.0.
+    # The striker split is adapted from the published FC26 six-stat fit:
+    # SHO 46%, PAS 3%, DRI 20%, DEF 0%, then renormalized after
+    # omitting unavailable PAC (12%) and PHY (19%).
+    weights = {
+        "ST":  (0.667, 0.043, 0.290, 0.000),
+        "CF":  (0.480, 0.200, 0.320, 0.000),
+        "LW":  (0.420, 0.160, 0.420, 0.000),
+        "RW":  (0.420, 0.160, 0.420, 0.000),
+        "CAM": (0.250, 0.400, 0.300, 0.050),
+        "CM":  (0.100, 0.400, 0.200, 0.300),
+        "CDM": (0.020, 0.250, 0.080, 0.650),
+        "LM":  (0.180, 0.280, 0.340, 0.200),
+        "RM":  (0.180, 0.280, 0.340, 0.200),
+        "LB":  (0.000, 0.150, 0.050, 0.800),
+        "RB":  (0.000, 0.150, 0.050, 0.800),
+        "LWB": (0.000, 0.200, 0.150, 0.650),
+        "RWB": (0.000, 0.200, 0.150, 0.650),
+        "CB":  (0.000, 0.100, 0.000, 0.900),
+        "LCB": (0.000, 0.100, 0.000, 0.900),
+        "RCB": (0.000, 0.100, 0.000, 0.900),
+    }
+    position_weights = weights.get(position, (0.200, 0.300, 0.200, 0.300))
+    stats = (shooting, passing, dribbling, defense)
+    score = sum(float(value or 0) * weight for value, weight in zip(stats, position_weights))
+    return int(round(score))
 
 
 def recalculate_catalog_overalls():
