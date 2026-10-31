@@ -275,6 +275,7 @@ async def player_lineup_image(request):
             return ImageFont.load_default(size=size)
 
     position_font = load_bold_font(158)
+    small_font = load_bold_font(108)  # Used for the lineup player-count subtitle.
     badge_font = load_bold_font(200)
     title_font = load_bold_font(130)
 
