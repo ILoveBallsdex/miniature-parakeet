@@ -227,9 +227,9 @@ async def player_lineup_image(request):
     from PIL import Image, ImageDraw, ImageFont, ImageOps
 
     # Keep the same near-2:3 portrait ratio Discord displayed larger before, with larger cards.
-    card_width, card_height = 625, 875
+    card_width, card_height = 937, 875
     label_height = 160
-    gap_x, padding_x = 90, 60
+    gap_x, padding_x = 135, 60
     row_gap, top_padding = 0, 160
     row_order = ("att", "cam", "mid", "cdm", "def", "gk")
     position_rows = {
@@ -258,7 +258,7 @@ async def player_lineup_image(request):
             rows[row_name].sort(key=lambda item: int(item["slot"]))
 
     # Keep a 2:3 image ratio for Discord while giving each card much more space.
-    canvas_width = 4000
+    canvas_width = 6000
     canvas_height = 6500
     row_height = card_height + label_height
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
