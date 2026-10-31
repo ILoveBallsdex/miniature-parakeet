@@ -128,15 +128,18 @@ def _clean_catalog_card(payload: dict, creating: bool):
     position = str(result.get("position", payload.get("position", ""))).upper()
     if position == "GK":
         if "goalkeeping" not in result:
-            result["goalkeeping"] = result.get("defense", 0)
+            if "defense" in result:
+                result["goalkeeping"] = result["defense"]  # Legacy imports only.
+            elif creating:
+                raise GameError("Goalkeepers require the goalkeeping stat.")
+            else:
+                result["goalkeeping"] = 0
     else:
         result.setdefault("goalkeeping", 0)
         if creating:
             missing_stats = [field for field in ("shooting", "passing", "dribbling", "defense") if field not in result]
             if missing_stats:
                 raise GameError("Missing player stats: " + ", ".join(missing_stats))
-    if position == "GK" and creating and "goalkeeping" not in result:
-        raise GameError("Goalkeepers require the goalkeeping stat.")
     if creating or "position" in result or any(field in result for field in ("shooting", "passing", "dribbling", "defense", "goalkeeping")):
         result["overall"] = calculate_overall(
             position, result.get("shooting", 0), result.get("passing", 0),
@@ -166,13 +169,22 @@ def create_catalog_card(payload: dict):
 
 
 def update_catalog_card(card_id: int, payload: dict):
-    values = _clean_catalog_card(payload, False)
-    values.pop("card_id", None)
-    if not values:
+    if not isinstance(payload, dict):
+        raise GameError("Card data must be an object.")
+    if not payload:
         raise GameError("Provide at least one card field to replace.")
+    stat_fields = {"position", "shooting", "passing", "dribbling", "defense", "goalkeeping", "attack", "speed"}
     with transaction() as db:
-        if not db.execute("SELECT 1 FROM cards WHERE card_id = ?", (card_id,)).fetchone():
+        existing = db.execute("SELECT * FROM cards WHERE card_id = ?", (card_id,)).fetchone()
+        if existing is None:
             raise GameError("Card not found.", 404)
+        merged = dict(existing)
+        merged.update(payload)
+        values = _clean_catalog_card(merged, False)
+        values.pop("card_id", None)
+        # If this was only a metadata edit, leave the already-calculated OVR alone.
+        if not (set(payload) & stat_fields):
+            values.pop("overall", None)
         assignments = ", ".join(f"{field} = ?" for field in values)
         db.execute(f"UPDATE cards SET {assignments} WHERE card_id = ?", (*values.values(), card_id))
         row = db.execute("SELECT * FROM cards WHERE card_id = ?", (card_id,)).fetchone()
