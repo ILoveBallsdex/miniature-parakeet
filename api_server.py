@@ -200,11 +200,11 @@ async def player_lineup_image(request):
     # Keep teammates in the same row far enough apart that their labels never collide.
     gap_x, padding_x = 420, 275
     row_gap, top_padding = 60, 115
-    row_order = ("att", "cam", "mid", "def", "gk")
+    row_order = ("att", "cam", "mid", "cdm", "def", "gk")
     position_rows = {
         "GK": "gk",
         "LB": "def", "CB": "def", "RB": "def",
-        "CDM": "mid", "CM": "mid", "CAM": "cam",
+        "CDM": "cdm", "CM": "mid", "CAM": "cam",
         "LW": "att", "ST": "att", "CF": "att", "RW": "att",
     }
     rows = {name: [] for name in row_order}
@@ -223,19 +223,6 @@ async def player_lineup_image(request):
                     int(item["slot"]),
                 )
             )
-        elif row_name == "mid" and sum(
-            str(item.get("position") or "").upper() == "CDM" for item in rows[row_name]
-        ) == 1 and sum(
-            str(item.get("position") or "").upper() == "CM" for item in rows[row_name]
-        ) == 2:
-            # Keep the CDM central, with one CM on either side.
-            midfielders = rows[row_name]
-            cms = sorted(
-                (item for item in midfielders if str(item.get("position") or "").upper() == "CM"),
-                key=lambda item: int(item["slot"]),
-            )
-            cdm = next(item for item in midfielders if str(item.get("position") or "").upper() == "CDM")
-            rows[row_name] = [cms[0], cdm, cms[1]]
         else:
             rows[row_name].sort(key=lambda item: int(item["slot"]))
 
