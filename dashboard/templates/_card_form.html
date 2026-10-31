@@ -1,4 +1,4 @@
-<!-- Shared card form fields — used by add_card.html and edit_card.html -->
+<!-- Shared card form fields - used by add_card.html and edit_card.html -->
 <div class="row g-3">
 
   <!-- Row 1: Identity -->
@@ -16,7 +16,7 @@
   <div class="col-md-2">
     <label class="form-label">Position</label>
     <select name="position" class="form-select">
-      <option value="">—</option>
+      <option value="">-</option>
       {% for p in positions %}
         <option value="{{ p }}" {% if card.get('position') == p %}selected{% endif %}>{{ p }}</option>
       {% endfor %}
