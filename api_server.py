@@ -234,16 +234,16 @@ async def player_lineup_image(request):
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
         position_font = ImageFont.truetype(font_path, 200)
-        name_font = ImageFont.truetype(font_path, 170)
+        name_font = ImageFont.truetype(font_path, 150)
         small_font = ImageFont.truetype(font_path, 130)
-        badge_font = ImageFont.truetype(font_path, 150)
-        title_font = ImageFont.truetype(font_path, 180)
+        badge_font = ImageFont.truetype(font_path, 170)
+        title_font = ImageFont.truetype(font_path, 200)
     except OSError:
         position_font = ImageFont.load_default(size=200)
-        name_font = ImageFont.load_default(size=170)
+        name_font = ImageFont.load_default(size=150)
         small_font = ImageFont.load_default(size=130)
-        badge_font = ImageFont.load_default(size=150)
-        title_font = ImageFont.load_default(size=180)
+        badge_font = ImageFont.load_default(size=170)
+        title_font = ImageFont.load_default(size=200)
 
     # Pitch markings.
     draw.rectangle((14, 14, canvas_width - 14, canvas_height - 14), outline=(220, 242, 225), width=4)
