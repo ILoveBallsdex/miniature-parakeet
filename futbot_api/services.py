@@ -110,17 +110,35 @@ def calculate_overall(position: str, shooting=0, passing=0, dribbling=0, defense
 
 
 def recalculate_catalog_overalls():
-    """Recalculate every existing card using the current position-group formula."""
+    """Backfill legacy card stats, then recalculate every card's OVR.
+
+    Older catalogs only stored attack/defense/speed. Convert those fields
+    when the newer stats are missing so imported cards do not show zero PAS.
+    """
     with transaction() as db:
-        rows = db.execute(
-            "SELECT card_id, position, shooting, passing, dribbling, defense, goalkeeping FROM cards"
-        ).fetchall()
+        rows = db.execute("SELECT * FROM cards").fetchall()
         for row in rows:
+            position = str(row["position"] or "").upper()
+            shooting = int(row["shooting"] or row["attack"] or 0)
+            passing = int(row["passing"] or 0)
+            dribbling = int(row["dribbling"] or row["speed"] or 0)
+            defense = int(row["defense"] or 0)
+            goalkeeping = int(row["goalkeeping"] or (defense if position == "GK" else 0))
+
+            # A zero PAS in a legacy import means the field was never copied.
+            # Estimate it from the available attacking and defensive ratings.
+            if passing == 0 and (shooting or defense) and position != "GK":
+                passing = round((shooting + defense) / 2)
+
             overall = calculate_overall(
-                row["position"], row["shooting"], row["passing"],
-                row["dribbling"], row["defense"], row["goalkeeping"],
+                position, shooting, passing, dribbling, defense, goalkeeping,
             )
-            db.execute("UPDATE cards SET overall = ? WHERE card_id = ?", (overall, row["card_id"]))
+            db.execute(
+                """UPDATE cards
+                SET shooting = ?, passing = ?, dribbling = ?, goalkeeping = ?, overall = ?
+                WHERE card_id = ?""",
+                (shooting, passing, dribbling, goalkeeping, overall, row["card_id"]),
+            )
     return len(rows)
 
 
