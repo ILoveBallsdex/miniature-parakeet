@@ -125,6 +125,19 @@ class FutBotServiceTests(unittest.TestCase):
         self.assertEqual(result["coins_earned"], services.card_value(92) // 2)
         self.assertEqual(services.get_player(123)["coins"], services.card_value(92) // 2)
 
+    def test_lineup_swap_moves_player_into_empty_slot(self):
+        with transaction() as db:
+            db.execute(
+                "INSERT INTO lineups (user_id, formation, slots) VALUES (123, '2-2-3', ?)",
+                ('{"5": 1}',),
+            )
+
+        result = services.swap_lineup_players(123, 5, 7)
+        slots = {item["slot"]: item["card"] for item in result["slots"]}
+        self.assertIsNone(slots[5])
+        self.assertEqual(slots[7]["card_id"], 1)
+        self.assertEqual(result["filled"], 1)
+
     def test_bronze_players_are_eligible_for_random_rewards(self):
         with transaction() as db:
             db.execute(
