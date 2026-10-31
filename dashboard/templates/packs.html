@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Packs — FutBot Dashboard{% endblock %}
+{% block title %}Packs - FutBot Dashboard{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
@@ -53,7 +53,7 @@
 
 {% if table_missing %}
   <div class="alert alert-danger">
-    Table <code>packs</code> does not exist yet — run the bot once to create it.
+    Table <code>packs</code> does not exist yet - run the bot once to create it.
   </div>
 {% else %}
 
@@ -88,7 +88,7 @@
     <tbody>
       {% for row in rows %}
       <tr>
-        <td class="fw-semibold">{{ row['player_name'] or '—' }}</td>
+        <td class="fw-semibold">{{ row['player_name'] or '-' }}</td>
         <td class="text-muted small font-monospace">{{ row['user_id'] }}</td>
         {% for col in pack_cols %}
         <td>
