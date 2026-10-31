@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Decks — FutBot Dashboard{% endblock %}
+{% block title %}Decks - FutBot Dashboard{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
@@ -40,7 +40,7 @@
     <tbody>
       {% for deck in decks %}
       <tr>
-        <td class="fw-semibold">{{ deck['player_name'] or '—' }}</td>
+        <td class="fw-semibold">{{ deck['player_name'] or '-' }}</td>
         <td class="text-muted small font-monospace">{{ deck['user_id'] }}</td>
         <td>{{ deck['deck_name'] }}</td>
         <td><span class="badge bg-secondary">{{ deck['card_count'] }}</span></td>
