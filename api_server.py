@@ -226,11 +226,11 @@ async def player_lineup_image(request):
         else:
             rows[row_name].sort(key=lambda item: int(item["slot"]))
 
-    max_players = max(1, *(len(row) for row in rows.values()))
-    # Use the maximum four-player row width for every formation so the pitch never changes size.
-    canvas_width = padding_x * 2 + 4 * card_width + 3 * gap_x
+    # Every formation uses the exact same large pitch dimensions.
+    # Player count only changes their positions within a row, never the pitch size.
+    canvas_width = 5200
+    canvas_height = 9000
     row_height = card_height + label_height
-    canvas_height = top_padding + len(row_order) * row_height + (len(row_order) - 1) * row_gap + 38
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
     draw = ImageDraw.Draw(canvas)
 
