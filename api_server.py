@@ -229,8 +229,8 @@ async def player_lineup_image(request):
     # Keep the same near-2:3 portrait ratio Discord displayed larger before, with larger cards.
     card_width, card_height = 625, 1094
     label_height = 200
-    gap_x, padding_x = 250, 75
-    row_gap, top_padding = 0, 200
+    gap_x, padding_x = 450, 75
+    row_gap, top_padding = 250, 200
     # Keep all midfield roles on one line so the back line and goalkeeper
     # remain visible inside the fixed-height canvas.
     row_order = ("att", "mid", "def", "gk")
@@ -268,17 +268,17 @@ async def player_lineup_image(request):
 
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        position_font = ImageFont.truetype(font_path, 138)
-        name_font = ImageFont.truetype(font_path, 106)
-        small_font = ImageFont.truetype(font_path, 90)
-        badge_font = ImageFont.truetype(font_path, 119)
-        title_font = ImageFont.truetype(font_path, 110)
+        position_font = ImageFont.truetype(font_path, 158)
+        name_font = ImageFont.truetype(font_path, 128)
+        small_font = ImageFont.truetype(font_path, 108)
+        badge_font = ImageFont.truetype(font_path, 140)
+        title_font = ImageFont.truetype(font_path, 130)
     except OSError:
-        position_font = ImageFont.load_default(size=138)
-        name_font = ImageFont.load_default(size=106)
-        small_font = ImageFont.load_default(size=90)
-        badge_font = ImageFont.load_default(size=119)
-        title_font = ImageFont.load_default(size=110)
+        position_font = ImageFont.load_default(size=158)
+        name_font = ImageFont.load_default(size=128)
+        small_font = ImageFont.load_default(size=108)
+        badge_font = ImageFont.load_default(size=140)
+        title_font = ImageFont.load_default(size=130)
 
     # Pitch markings.
     draw.rectangle((14, 14, canvas_width - 14, canvas_height - 14), outline=(220, 242, 225), width=4)
@@ -302,13 +302,54 @@ async def player_lineup_image(request):
 
     for row_index, row_name in enumerate(row_order):
         row = rows[row_name]
-        y = top_padding + row_index * (row_height + row_gap)
+        row_y = top_padding + row_index * (row_height + row_gap)
         count = len(row)
         total_width = count * card_width + max(0, count - 1) * gap_x
-        # Center even a single player/card on the pitch.
+        # Center each line of players on the pitch.
         start_x = (canvas_width - total_width) // 2 - 15
+
+        # Midfielders use a custom shape: CAM sits above the CMs and CDM
+        # sits below them. If both are present (2-4-1), offset them to
+        # opposite sides of the center line so their full-size cards do not overlap.
+        midfield_positions = [
+            str(item.get("position") or "").upper() for item in row
+        ] if row_name == "mid" else []
+        cm_items = [
+            item for item in row
+            if str(item.get("position") or "").upper() == "CM"
+        ]
+        special_midfield_count = sum(
+            position in ("CAM", "CDM") for position in midfield_positions
+        )
+        cm_total_width = len(cm_items) * card_width + max(0, len(cm_items) - 1) * gap_x
+        cm_start_x = (canvas_width - cm_total_width) // 2
+        cm_index = 0
+
         for index, slot in enumerate(row):
+            position = str(slot.get("position") or "").upper()
             x = start_x + index * (card_width + gap_x)
+            y = row_y
+
+            if row_name == "mid" and special_midfield_count:
+                if position == "CM":
+                    if special_midfield_count == 2 and len(cm_items) == 2:
+                        # Leave the center lanes for the CAM and CDM.
+                        center = canvas_width // 2
+                        spacing = card_width + gap_x
+                        cm_centers = (center - 1.5 * spacing, center + 1.5 * spacing)
+                        x = int(cm_centers[cm_index] - card_width / 2)
+                    else:
+                        x = cm_start_x + cm_index * (card_width + gap_x)
+                    cm_index += 1
+                elif position in ("CAM", "CDM"):
+                    center = canvas_width // 2
+                    if special_midfield_count == 2:
+                        offset = card_width / 2 + gap_x / 2
+                        x = int(center - offset - card_width / 2) if position == "CAM" else int(center + offset - card_width / 2)
+                    else:
+                        x = center - card_width // 2
+                    y = row_y - 200 if position == "CAM" else row_y + 200
+
             card = slot.get("card")
             if card and card.get("image_path"):
                 try:
