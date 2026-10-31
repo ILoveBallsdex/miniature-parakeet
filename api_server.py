@@ -294,6 +294,8 @@ async def player_lineup_image(request):
     draw.text(((canvas_width - title_width) // 2, 23),
               title, font=title_font, fill=(255, 255, 255))
 
+    formation_name = str(lineup.get("formation") or "").replace(" ", "").upper()
+
     for row_index, row_name in enumerate(row_order):
         row = rows[row_name]
         row_y = top_padding + row_index * (row_height + row_gap)
