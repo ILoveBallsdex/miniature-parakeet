@@ -1419,6 +1419,8 @@ def main():
         raise RuntimeError("FUTBOT_API_KEY is required. Set it in the environment.")
 
     init_database()
+    updated_cards = services.recalculate_catalog_overalls()
+    logger.info("Recalculated OVR for %s existing cards", updated_cards)
     seed_test_cards()
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("PORT", os.getenv("API_PORT", "8000")))
