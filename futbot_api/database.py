@@ -159,6 +159,10 @@ def init_database() -> None:
         )""")
 
         _add_columns(db, "cards", {
+            "shooting": "INTEGER",
+            "passing": "INTEGER",
+            "dribbling": "INTEGER",
+            "goalkeeping": "INTEGER",
             "total_battles_played": "INTEGER DEFAULT 0",
             "total_battles_won": "INTEGER DEFAULT 0",
             "total_rounds_played": "INTEGER DEFAULT 0",
@@ -186,6 +190,33 @@ def init_database() -> None:
         _add_columns(db, "market_listings", {
             "status": "TEXT DEFAULT 'active'", "resolved_at": "TEXT", "buyer_id": "INTEGER",
         })
+        # Migrate legacy stats once; existing DEF values remain unchanged.
+        db.execute("""UPDATE cards SET
+            shooting = COALESCE(shooting, attack, 0),
+            passing = COALESCE(passing, CAST((COALESCE(attack, 0) + COALESCE(defense, 0)) / 2 AS INTEGER)),
+            dribbling = COALESCE(dribbling, speed, 0),
+            goalkeeping = COALESCE(goalkeeping, CASE WHEN UPPER(position) = 'GK' THEN defense ELSE 0 END)
+        """)
+        weights_by_position = {
+            "ST": (0.45, 0.15, 0.30, 0.10), "CF": (0.35, 0.30, 0.25, 0.10),
+            "LW": (0.30, 0.20, 0.35, 0.15), "RW": (0.30, 0.20, 0.35, 0.15),
+            "CAM": (0.25, 0.35, 0.30, 0.10), "CM": (0.15, 0.35, 0.25, 0.25),
+            "CDM": (0.10, 0.30, 0.20, 0.40), "LM": (0.20, 0.25, 0.35, 0.20),
+            "RM": (0.20, 0.25, 0.35, 0.20), "LB": (0.05, 0.15, 0.15, 0.65),
+            "LWB": (0.05, 0.20, 0.25, 0.50), "CB": (0.05, 0.15, 0.10, 0.70),
+            "LCB": (0.05, 0.15, 0.10, 0.70), "RCB": (0.05, 0.15, 0.10, 0.70),
+            "RB": (0.05, 0.15, 0.15, 0.65), "RWB": (0.05, 0.20, 0.25, 0.50),
+        }
+        for card in db.execute("SELECT card_id, position, shooting, passing, dribbling, defense, goalkeeping FROM cards").fetchall():
+            position = str(card["position"] or "").upper()
+            if position == "GK":
+                rating = int(card["goalkeeping"] or 0)
+            else:
+                weights = weights_by_position.get(position, (0.20, 0.25, 0.25, 0.30))
+                stats = (card["shooting"], card["passing"], card["dribbling"], card["defense"])
+                rating = round(sum(float(value or 0) * weight for value, weight in zip(stats, weights)))
+            db.execute("UPDATE cards SET overall = ? WHERE card_id = ?", (max(1, min(99, rating)), card["card_id"]))
+
         db.execute("CREATE INDEX IF NOT EXISTS idx_inventory_user ON inventories(user_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_inventory_card ON inventories(card_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_cards_name ON cards(name)")
