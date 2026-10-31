@@ -315,6 +315,14 @@ async def player_lineup_image(request):
             row_gap_x = 700
         elif row_name == "def" and count == 3:
             row_gap_x = 1050
+        elif row_name == "def" and count == 2:
+            # Keep the two center-backs farther apart in two-defender formations.
+            row_gap_x = 1100
+        elif row_name == "att" and len(rows["def"]) == 4 and sum(
+            str(item.get("position") or "").upper() == "ST" for item in row
+        ) == 2:
+            # Give the two strikers extra width in the 4-1-2 setup.
+            row_gap_x = 1000
         else:
             row_gap_x = gap_x
         total_width = count * card_width + max(0, count - 1) * row_gap_x
@@ -333,7 +341,14 @@ async def player_lineup_image(request):
         special_midfield_count = sum(
             position in ("CAM", "CDM") for position in midfield_positions
         )
-        cm_total_width = len(cm_items) * card_width + max(0, len(cm_items) - 1) * gap_x
+        # Use wider spacing for the two central midfielders in the requested
+        # two-, three-, and 4-2-1-defender layouts.
+        cm_gap_x = gap_x
+        if len(cm_items) == 2 and len(rows["def"]) in (2, 3):
+            cm_gap_x = 1100
+        elif len(cm_items) == 2 and len(rows["def"]) == 4:
+            cm_gap_x = 950
+        cm_total_width = len(cm_items) * card_width + max(0, len(cm_items) - 1) * cm_gap_x
         cm_start_x = (canvas_width - cm_total_width) // 2
         cm_index = 0
 
@@ -360,15 +375,23 @@ async def player_lineup_image(request):
                     if special_midfield_count == 2 and len(cm_items) == 2:
                         # Keep the two CMs wide so the CAM/CDM center lane stays clear.
                         center = canvas_width // 2
-                        spacing = card_width + gap_x
+                        spacing = card_width + cm_gap_x
                         cm_centers = (center - 1.5 * spacing, center + 1.5 * spacing)
                         x = int(cm_centers[cm_index] - card_width / 2)
                     else:
-                        x = cm_start_x + cm_index * (card_width + gap_x)
+                        x = cm_start_x + cm_index * (card_width + cm_gap_x)
                     cm_index += 1
                 elif position in ("CAM", "CDM"):
                     x = canvas_width // 2 - card_width // 2
-                    y = row_y - 550 if position == "CAM" else row_y + 900
+                    if position == "CAM":
+                        y = row_y - 550
+                    elif position == "CDM":
+                        if len(rows["def"]) == 3:
+                            y = row_y + 500
+                        elif len(rows["def"]) == 2:
+                            y = row_y + 1200
+                        else:
+                            y = row_y + 900
 
             card = slot.get("card")
             if card and card.get("image_path"):
