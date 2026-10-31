@@ -51,6 +51,58 @@ def search_cards(search: str = "", limit: int = 50, offset: int = 0):
     return [dict(row) for row in rows]
 
 
+def search_card_catalog(search: str = "", limit: int = 5, offset: int = 0,
+                        tier: str | None = None, position: str | None = None):
+    """Search the standard-player catalog by pack tier and position, with total count."""
+    limit = max(1, min(int(limit), 100))
+    offset = max(0, int(offset))
+    tier = str(tier or "").strip().lower()
+    position = str(position or "").strip().upper()
+
+    tier_ranges = {
+        "bronze": (45, 64),
+        "silver": (65, 74),
+        "gold": (75, 99),
+    }
+    if tier and tier not in (*tier_ranges.keys(), "special"):
+        raise GameError("Choose bronze, silver, gold, or special.")
+
+    # Special cards are intentionally unavailable in this catalog view for now.
+    if tier == "special":
+        return {"cards": [], "total": 0}
+
+    clauses = []
+    params = []
+    if tier:
+        low, high = tier_ranges[tier]
+        clauses.extend(["card_type = 'Standard'", "overall BETWEEN ? AND ?"])
+        params.extend([low, high])
+    if position:
+        clauses.append("UPPER(COALESCE(position, '')) = ?")
+        params.append(position)
+    if search:
+        clauses.append("(name LIKE ? OR CAST(card_id AS TEXT) = ?)")
+        params.extend([f"%{search}%", search])
+
+    where = " WHERE " + " AND ".join(clauses) if clauses else ""
+    with read_connection() as db:
+        total = db.execute("SELECT COUNT(*) AS total FROM cards" + where, params).fetchone()["total"]
+        rows = db.execute(
+            "SELECT * FROM cards" + where +
+            " ORDER BY overall DESC, name COLLATE NOCASE ASC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
+        ).fetchall()
+
+    cards = []
+    for row in rows:
+        card = dict(row)
+        overall = int(card.get("overall") or 0)
+        card["value"] = card_value(overall)
+        card["quicksell_value"] = quicksell_value(overall)
+        cards.append(card)
+    return {"cards": cards, "total": int(total)}
+
+
 
 # --------------------------- Admin card catalog ------------------------------
 
