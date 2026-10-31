@@ -796,32 +796,21 @@ def set_lineup_formation(user_id,formation):
 
 
 def _weighted_card_rows(db, excluded_ids=()):
+    """Return cards weighted so each OVR tier gets its configured share."""
     rows = db.execute("SELECT * FROM cards ORDER BY card_id").fetchall()
-    weighted = []
     excluded = set(excluded_ids)
-    for card in rows:
-        if card["card_id"] in excluded:
-            continue
-        overall = card["overall"] or 0
-        card_type = card["card_type"] or ""
-        weight = 0
-        if card_type == "Standard":
-            if 0 < overall <= 64: weight = 10  # Bronze players: possible, but uncommon.
-            elif 70 <= overall <= 79: weight = 70
-            elif 80 <= overall <= 85: weight = 20
-            elif 86 <= overall <= 90: weight = 7
-            elif overall > 90: weight = 3
-        elif card_type == "Hero":
-            weight = 2
-        elif card_type == "Icon":
-            if 80 <= overall <= 89: weight = 2
-            elif overall >= 90: weight = 1
-        elif card_type in ("Euro TOTT", "Copa America TOTT"):
-            weight = 1
-        if weight:
-            weighted.append((card, weight))
+    eligible = [card for card in rows if card["card_id"] not in excluded]
+    tiers = ((45, 64, 35), (65, 74, 30), (75, 79, 20), (80, 90, 10), (91, 99, 5))
+    counts = {(low, high): sum(1 for card in eligible if low <= int(card["overall"] or 0) <= high) for low, high, _ in tiers}
+    weighted = []
+    for card in eligible:
+        overall = int(card["overall"] or 0)
+        for low, high, chance in tiers:
+            count = counts[(low, high)]
+            if low <= overall <= high and count:
+                weighted.append((card, chance / count))
+                break
     return weighted
-
 
 def _weighted_choice(weighted):
     if not weighted:
