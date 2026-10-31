@@ -229,7 +229,7 @@ async def player_lineup_image(request):
     # Keep the same near-2:3 portrait ratio Discord displayed larger before, with larger cards.
     card_width, card_height = 625, 1094
     label_height = 200
-    gap_x, padding_x = 450, 75
+    gap_x, padding_x = 650, 75
     row_gap, top_padding = 250, 200
     # Keep all midfield roles on one line so the back line and goalkeeper
     # remain visible inside the fixed-height canvas.
@@ -275,9 +275,7 @@ async def player_lineup_image(request):
             return ImageFont.load_default(size=size)
 
     position_font = load_bold_font(158)
-    name_font = load_bold_font(128)
-    small_font = load_bold_font(108)
-    badge_font = load_bold_font(140)
+    badge_font = load_bold_font(200)
     title_font = load_bold_font(130)
 
     # Pitch markings.
@@ -303,14 +301,17 @@ async def player_lineup_image(request):
     for row_index, row_name in enumerate(row_order):
         row = rows[row_name]
         row_y = top_padding + row_index * (row_height + row_gap)
+        # Give the deeper midfield role extra room, then shift the back line
+        # and goalkeeper down to keep the CDM card and its position label clear.
+        if row_name in ("def", "gk"):
+            row_y += 350
         count = len(row)
         total_width = count * card_width + max(0, count - 1) * gap_x
         # Center each line of players on the pitch.
         start_x = (canvas_width - total_width) // 2 - 15
 
-        # Midfielders use a custom shape: CAM sits above the CMs and CDM
-        # sits below them. If both are present (2-4-1), offset them to
-        # opposite sides of the center line so their full-size cards do not overlap.
+        # CAM and CDM share the exact center x-coordinate, with separate
+        # vertical positions. CMs spread out to either side.
         midfield_positions = [
             str(item.get("position") or "").upper() for item in row
         ] if row_name == "mid" else []
@@ -333,7 +334,7 @@ async def player_lineup_image(request):
             if row_name == "mid" and special_midfield_count:
                 if position == "CM":
                     if special_midfield_count == 2 and len(cm_items) == 2:
-                        # Leave the center lanes for the CAM and CDM.
+                        # Keep the two CMs wide so the CAM/CDM center lane stays clear.
                         center = canvas_width // 2
                         spacing = card_width + gap_x
                         cm_centers = (center - 1.5 * spacing, center + 1.5 * spacing)
@@ -342,13 +343,8 @@ async def player_lineup_image(request):
                         x = cm_start_x + cm_index * (card_width + gap_x)
                     cm_index += 1
                 elif position in ("CAM", "CDM"):
-                    center = canvas_width // 2
-                    if special_midfield_count == 2:
-                        offset = card_width / 2 + gap_x / 2
-                        x = int(center - offset - card_width / 2) if position == "CAM" else int(center + offset - card_width / 2)
-                    else:
-                        x = center - card_width // 2
-                    y = row_y - 200 if position == "CAM" else row_y + 200
+                    x = canvas_width // 2 - card_width // 2
+                    y = row_y - 600 if position == "CAM" else row_y + 600
 
             card = slot.get("card")
             if card and card.get("image_path"):
@@ -365,13 +361,13 @@ async def player_lineup_image(request):
                     if penalty > 0:
                         badge_text = f"-{penalty}"
                         bounds = draw.textbbox((0, 0), badge_text, font=badge_font)
-                        badge_w = bounds[2] - bounds[0] + 131
-                        badge_h = bounds[3] - bounds[1] + 106
+                        badge_w = bounds[2] - bounds[0] + 190
+                        badge_h = bounds[3] - bounds[1] + 150
                         bx, by = x + card_width - badge_w - 13, y + 13
                         draw.rounded_rectangle((bx, by, bx + badge_w, by + badge_h),
-                                               radius=48, fill=(210, 25, 38),
-                                               outline=(255, 255, 255), width=15)
-                        draw.text((bx + 65, by + 50), badge_text,
+                                               radius=58, fill=(210, 25, 38),
+                                               outline=(255, 255, 255), width=18)
+                        draw.text((bx + 95, by + 72), badge_text,
                                   font=badge_font, fill=(255, 255, 255),
                                   stroke_width=1, stroke_fill=(120, 0, 0))
                 except Exception:
@@ -379,52 +375,15 @@ async def player_lineup_image(request):
             else:
                 card = None
 
-            position_label = f"{slot['position']} ({slot['slot']})"
-            if card:
-                full_name = " ".join(str(card.get("name") or "Unknown").split())
-                short_names = {
-                    "Vinicius Junior": "Vini Jr.",
-                    "Vinícius Júnior": "Vini Jr.",
-                    "Kylian Mbappe": "Mbappé",
-                    "Kevin De Bruyne": "De Bruyne",
-                    "Virgil van Dijk": "Van Dijk",
-                    "Alexis Mac Allister": "Mac Allister",
-                    "Lautaro Martinez": "Martinez",
-                    "Federico Valverde": "Valverde",
-                    "Jamal Musiala": "Musiala",
-                    "Antoine Griezmann": "Griezmann",
-                    "Mohamed Salah": "Salah",
-                    "Jude Bellingham": "Bellingham",
-                }
-                name_label = short_names.get(full_name, full_name.split()[-1])
-                # Keep even longer surnames inside the width of their own card.
-                name_font_for_player = name_font
-                while draw.textbbox((0, 0), name_label, font=name_font_for_player)[2] > card_width - 12:
-                    current_size = getattr(name_font_for_player, "size", 80)
-                    if current_size <= 56:
-                        break
-                    name_font_for_player = load_bold_font(current_size - 9)
-                rating_label = f"{card.get('effective_overall', card.get('overall', '-'))} OVR"
-            else:
-                name_label = "Empty"
-                name_font_for_player = name_font
-                rating_label = " "
-
-            # Align labels with the card itself; remove the previous rightward offset.
+            position_label = str(slot["position"]).upper()
+            # The card artwork already contains the player's name and overall.
+            # Keep only the position label underneath each card.
             label_center_x = x + card_width // 2
             position_box = draw.textbbox((0, 0), position_label, font=position_font)
-            name_box = draw.textbbox((0, 0), name_label, font=name_font_for_player)
-            rating_box = draw.textbbox((0, 0), rating_label, font=small_font)
             draw.text((label_center_x - (position_box[2] - position_box[0]) // 2,
                        y + card_height + 0), position_label,
                       font=position_font, fill=(255, 255, 255),
                       stroke_width=1, stroke_fill=(20, 45, 30))
-            draw.text((label_center_x - (name_box[2] - name_box[0]) // 2,
-                       y + card_height + 275), name_label,
-                      font=name_font, fill=(255, 255, 255))
-            draw.text((label_center_x - (rating_box[2] - rating_box[0]) // 2,
-                       y + card_height + 475), rating_label,
-                      font=small_font, fill=(235, 245, 235))
 
     # Keep the generated image at its native dimensions to limit Railway memory use.
     output = BytesIO()
