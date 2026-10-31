@@ -386,7 +386,7 @@ def _match_card_name(rows, player_name):
 
     # Compare against full names and individual name parts. Keep the threshold
     # high so unrelated or random text is not treated as a player name.
-    max_edits = 1 if len(normalized_query.replace(" ", "")) <= 7 else 2
+    max_edits = 1 if len(normalized_query.replace(" ", "")) <= 2 else 2
     scored = []
     for row in rows:
         candidate = normalize(row["name"])
