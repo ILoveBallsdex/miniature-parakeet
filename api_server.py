@@ -194,10 +194,10 @@ async def player_lineup_image(request):
     from PIL import Image, ImageDraw, ImageFont, ImageOps
 
     # Keep the same near-2:3 portrait ratio Discord displayed larger before, with larger cards.
-    card_width, card_height = 1100, 1540
-    label_height = 300
-    gap_x, padding_x = 160, 100
-    row_gap, top_padding = 0, 300
+    card_width, card_height = 1250, 1750
+    label_height = 320
+    gap_x, padding_x = 180, 120
+    row_gap, top_padding = 0, 320
     row_order = ("att", "cam", "mid", "cdm", "def", "gk")
     position_rows = {
         "GK": "gk",
@@ -225,25 +225,25 @@ async def player_lineup_image(request):
             rows[row_name].sort(key=lambda item: int(item["slot"]))
 
     # Keep a 2:3 image ratio for Discord while giving each card much more space.
-    canvas_width = 7200
-    canvas_height = 11650
+    canvas_width = 8000
+    canvas_height = 13000
     row_height = card_height + label_height
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
     draw = ImageDraw.Draw(canvas)
 
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        position_font = ImageFont.truetype(font_path, 200)
-        name_font = ImageFont.truetype(font_path, 150)
-        small_font = ImageFont.truetype(font_path, 130)
-        badge_font = ImageFont.truetype(font_path, 170)
-        title_font = ImageFont.truetype(font_path, 200)
+        position_font = ImageFont.truetype(font_path, 220)
+        name_font = ImageFont.truetype(font_path, 170)
+        small_font = ImageFont.truetype(font_path, 145)
+        badge_font = ImageFont.truetype(font_path, 190)
+        title_font = ImageFont.truetype(font_path, 220)
     except OSError:
-        position_font = ImageFont.load_default(size=200)
-        name_font = ImageFont.load_default(size=150)
-        small_font = ImageFont.load_default(size=130)
-        badge_font = ImageFont.load_default(size=170)
-        title_font = ImageFont.load_default(size=200)
+        position_font = ImageFont.load_default(size=220)
+        name_font = ImageFont.load_default(size=170)
+        small_font = ImageFont.load_default(size=145)
+        badge_font = ImageFont.load_default(size=190)
+        title_font = ImageFont.load_default(size=220)
 
     # Pitch markings.
     draw.rectangle((14, 14, canvas_width - 14, canvas_height - 14), outline=(220, 242, 225), width=4)
