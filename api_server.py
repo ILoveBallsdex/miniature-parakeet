@@ -340,8 +340,8 @@ async def player_lineup_image(request):
             x = start_x + index * (card_width + row_gap_x)
             y = row_y
             if row_name == "gk":
-                # Offset the goalkeeper horizontally from the central CB.
-                x += 150
+                # Align the goalkeeper with the CAM and CDM on the same x-axis.
+                x = canvas_width // 2 - card_width // 2
             if row_name == "att" and position == "CF":
                 y += 250
 
