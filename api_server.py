@@ -218,7 +218,8 @@ async def player_lineup_image(request):
         y = top_padding + row_index * (row_height + row_gap)
         count = len(row)
         total_width = count * card_width + max(0, count - 1) * gap_x
-        start_x = (canvas_width - total_width) // 2 if count else canvas_width // 2
+        # Center even a single player/card on the pitch.
+        start_x = (canvas_width - total_width) // 2
         for index, slot in enumerate(row):
             x = start_x + index * (card_width + gap_x)
             card = slot.get("card")
