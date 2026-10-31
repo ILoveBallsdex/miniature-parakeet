@@ -404,14 +404,41 @@ def get_lineup(user_id):
   if not db.execute("SELECT 1 FROM players WHERE user_id=?",(user_id,)).fetchone(): raise GameError("Player not found. Register first.",404)
   return _lineup_data(db,user_id)
 
+def _match_owned_lineup_player(db, user_id, player_name):
+ import difflib
+ query = " ".join(str(player_name or "").lower().split())
+ if not query: raise GameError("Enter at least part of the player's name.")
+ rows = db.execute(
+  "SELECT c.card_id,c.name,c.overall FROM cards c JOIN inventories i ON i.card_id=c.card_id WHERE i.user_id=? ORDER BY c.overall DESC",
+  (user_id,)
+ ).fetchall()
+ if not rows: raise GameError("You don't own any players yet.",404)
+ exact = [r for r in rows if str(r["name"]).lower() == query]
+ if exact: return exact[0]
+ partial = [r for r in rows if query in str(r["name"]).lower()]
+ if len(partial) == 1: return partial[0]
+ if len(partial) > 1:
+  raise GameError("That name matches multiple players: " + ", ".join(r["name"] for r in partial[:8]) + ". Type a little more of the name.")
+ scored = []
+ for r in rows:
+  name = str(r["name"]).lower()
+  score = difflib.SequenceMatcher(None, query, name).ratio()
+  score = max(score, max((difflib.SequenceMatcher(None, query, part).ratio() for part in name.split()), default=0))
+  if score >= 0.55: scored.append((score, r))
+ scored.sort(key=lambda item: item[0], reverse=True)
+ if not scored: raise GameError("I couldn't find a player matching that name. Try another part of the name.",404)
+ if len(scored) > 1 and scored[0][0] - scored[1][0] < 0.08:
+  raise GameError("That could match multiple players: " + ", ".join(item[1]["name"] for item in scored[:5]) + ". Type a little more of the name.")
+ return scored[0][1]
+
+
 def add_lineup_player(user_id,player_name,slot):
  slot=int(slot)
  if not 1<=slot<=8: raise GameError("Slot must be from 1 to 8.")
  with transaction() as db:
   row=db.execute("SELECT formation,slots FROM lineups WHERE user_id=?",(user_id,)).fetchone()
   formation=row["formation"] if row else "2-2-3"; slots=json.loads(row["slots"]) if row else {}
-  card=db.execute("SELECT c.card_id FROM cards c JOIN inventories i ON i.card_id=c.card_id WHERE i.user_id=? AND lower(c.name)=lower(?) ORDER BY c.overall DESC LIMIT 1",(user_id,str(player_name).strip())).fetchone()
-  if not card: raise GameError("You don't own that player. Enter the exact player name.",404)
+  card=_match_owned_lineup_player(db,user_id,player_name)
   cid=int(card["card_id"])
   if str(slot) in slots and int(slots[str(slot)])!=cid: raise GameError("That slot is occupied. Remove its player first.",409)
   if str(cid) in [str(v) for k,v in slots.items() if k!=str(slot)]: raise GameError("That player is already in your lineup.",409)
@@ -419,19 +446,34 @@ def add_lineup_player(user_id,player_name,slot):
   db.execute("INSERT INTO lineups(user_id,formation,slots) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET slots=excluded.slots",(user_id,formation,json.dumps(slots)))
   return _lineup_data(db,user_id)
 
-def remove_lineup_player(user_id,player_name,slot):
+
+def remove_lineup_player(user_id,slot):
  slot=int(slot)
  if not 1<=slot<=8: raise GameError("Slot must be from 1 to 8.")
  with transaction() as db:
-  row=db.execute("SELECT formation,slots FROM lineups WHERE user_id=?",(user_id,)).fetchone()
+  row=db.execute("SELECT slots FROM lineups WHERE user_id=?",(user_id,)).fetchone()
   if not row: raise GameError("You don't have a lineup yet.",404)
-  slots=json.loads(row["slots"]); cid=slots.get(str(slot))
-  if cid is None: raise GameError("That slot is empty.",404)
-  card=db.execute("SELECT name FROM cards WHERE card_id=?",(cid,)).fetchone()
-  if not card or card["name"].lower()!=str(player_name).strip().lower(): raise GameError("Player name doesn't match the player in that slot.",409)
+  slots=json.loads(row["slots"])
+  if slots.get(str(slot)) is None: raise GameError("That slot is empty.",404)
   del slots[str(slot)]
   db.execute("UPDATE lineups SET slots=? WHERE user_id=?",(json.dumps(slots),user_id))
   return _lineup_data(db,user_id)
+
+
+def swap_lineup_players(user_id,slot1,slot2):
+ slot1,slot2=int(slot1),int(slot2)
+ if not 1<=slot1<=8 or not 1<=slot2<=8: raise GameError("Both slots must be from 1 to 8.")
+ if slot1==slot2: raise GameError("Choose two different slots to swap.")
+ with transaction() as db:
+  row=db.execute("SELECT slots FROM lineups WHERE user_id=?",(user_id,)).fetchone()
+  if not row: raise GameError("You don't have a lineup yet.",404)
+  slots=json.loads(row["slots"])
+  first,second=slots.get(str(slot1)),slots.get(str(slot2))
+  if first is None or second is None: raise GameError("Both slots must contain a player before you can swap them.",404)
+  slots[str(slot1)],slots[str(slot2)]=second,first
+  db.execute("UPDATE lineups SET slots=? WHERE user_id=?",(json.dumps(slots),user_id))
+  return _lineup_data(db,user_id)
+
 
 def set_lineup_formation(user_id,formation):
  formation=str(formation or "").strip()
