@@ -304,7 +304,9 @@ async def player_lineup_image(request):
         elif row_name == "def":
             # Raise a three-player back line slightly so it sits farther
             # above the goalkeeper while remaining well below the CDM.
-            row_y += 1450 if len(row) == 3 else 1800
+            # Keep the three-player CB fully visible above the goalkeeper.
+            # This still leaves a clear gap below the CDM.
+            row_y += 850 if len(row) == 3 else 1800
         elif row_name == "gk":
             row_y += 400
         count = len(row)
@@ -341,6 +343,14 @@ async def player_lineup_image(request):
             position = str(slot.get("position") or "").upper()
             x = start_x + index * (card_width + row_gap_x)
             y = row_y
+            if row_name == "def" and count == 4 and position == "CB":
+                # Keep LB/RB fixed, but push the two CBs farther apart.
+                cb_positions = [
+                    i for i, item in enumerate(row)
+                    if str(item.get("position") or "").upper() == "CB"
+                ]
+                cb_side = cb_positions.index(index)
+                x += -200 if cb_side == 0 else 200
             if row_name == "gk":
                 # Align the goalkeeper with the CAM and CDM on the same x-axis.
                 x = canvas_width // 2 - card_width // 2
