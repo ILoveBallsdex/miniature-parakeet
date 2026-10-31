@@ -54,15 +54,40 @@ def main():
         # wishlists, and global battle statistics start fresh for the new player base.
         catalog_columns = [
             "card_id", "player_id", "name", "attack", "defense", "speed",
+            "shooting", "passing", "dribbling", "goalkeeping",
             "height", "club", "position", "overall", "image_path",
             "card_rarity", "card_type", "league", "nation",
         ]
-        columns = [column for column in catalog_columns if column in source_columns and column in target_columns]
+        stat_columns = {"shooting", "passing", "dribbling", "goalkeeping"}
+        columns = [
+            column for column in catalog_columns
+            if column in target_columns and (column in source_columns or column in stat_columns)
+        ]
         if "card_id" not in columns or "name" not in columns:
             raise SystemExit("The source cards table is missing required catalog columns.")
+
+        def imported_value(row, column):
+            if column not in stat_columns:
+                return row[column] if column in source_columns else None
+
+            position = str(row["position"] or "").upper() if "position" in source_columns else ""
+            defense = int(row["defense"] or 0) if "defense" in source_columns else 0
+            attack = int(row["attack"] or 0) if "attack" in source_columns else 0
+            speed = int(row["speed"] or 0) if "speed" in source_columns else 0
+
+            if column == "shooting":
+                return (row["shooting"] if "shooting" in source_columns and row["shooting"] else attack)
+            if column == "passing":
+                existing = row["passing"] if "passing" in source_columns else 0
+                return existing or (round((attack + defense) / 2) if position != "GK" else 0)
+            if column == "dribbling":
+                return (row["dribbling"] if "dribbling" in source_columns and row["dribbling"] else speed)
+            existing = row["goalkeeping"] if "goalkeeping" in source_columns else 0
+            return existing or (defense if position == "GK" else 0)
+
         quoted = ", ".join('"' + column.replace('"', '""') + '"' for column in columns)
         placeholders = ", ".join("?" for _ in columns)
-        values = [[row[column] for column in columns] for row in rows]
+        values = [[imported_value(row, column) for column in columns] for row in rows]
 
         target.execute("BEGIN IMMEDIATE")
         # The destination is the new game database. Clear any previous player
