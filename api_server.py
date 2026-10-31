@@ -213,11 +213,21 @@ async def player_lineup_image(request):
         row_name = position_rows.get(position, "mid")
         rows[row_name].append(slot)
     for row_name in row_order:
-        # Slot order follows the selected formation's intended left-to-right layout.
-        rows[row_name].sort(key=lambda item: int(item["slot"]))
+        # Defenders always appear left-to-right as LB, CB, RB, regardless of
+        # the order in which those positions are stored in the formation.
+        if row_name == "def":
+            defensive_order = {"LB": 0, "CB": 1, "RB": 2}
+            rows[row_name].sort(
+                key=lambda item: (
+                    defensive_order.get(str(item.get("position") or "").upper(), 1),
+                    int(item["slot"]),
+                )
+            )
+        else:
+            rows[row_name].sort(key=lambda item: int(item["slot"]))
 
     max_players = max(1, *(len(row) for row in rows.values()))
-    canvas_width = max(2000, padding_x * 2 + max_players * card_width + (max_players - 1) * gap_x)
+    canvas_width = max(2800, padding_x * 2 + max_players * card_width + (max_players - 1) * gap_x)
     row_height = card_height + label_height
     canvas_height = top_padding + len(row_order) * row_height + (len(row_order) - 1) * row_gap + 38
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
