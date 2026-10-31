@@ -63,6 +63,34 @@ class FutBotServiceTests(unittest.TestCase):
         self.assertEqual(result["balance"], services.card_value(87))
         self.assertEqual(services.get_inventory(123), [])
 
+
+    def test_player_name_lookup_handles_small_typos_but_rejects_gibberish(self):
+        card = services.find_catalog_card("Tset Icn")
+        self.assertEqual(card["name"], "Test Icon")
+        self.assertEqual(card["value"], services.card_value(92))
+        with self.assertRaises(services.GameError):
+            services.find_catalog_card("qzxvplm")
+
+    def test_buy_player_card_deducts_value_and_adds_inventory(self):
+        cost = services.card_value(92)
+        with transaction() as db:
+            db.execute("UPDATE players SET coins = ? WHERE user_id = 123", (cost + 500,))
+        result = services.buy_player_card(123, 1)
+        self.assertEqual(result["coins_spent"], cost)
+        self.assertEqual(result["balance"], 500)
+        self.assertEqual(len(services.get_inventory(123)), 1)
+
+    def test_buy_player_card_rejects_insufficient_coins(self):
+        with self.assertRaises(services.GameError):
+            services.buy_player_card(123, 1)
+
+    def test_sell_name_lookup_only_finds_owned_players(self):
+        self.add_owned_card(123, 1)
+        card = services.find_owned_card(123, "Test Icn")
+        self.assertEqual(card["card_id"], 1)
+        with self.assertRaises(services.GameError):
+            services.find_owned_card(123, "Test Hero")
+
     def test_player_values_scale_with_overall_and_quicksell_is_half(self):
         self.assertEqual(services.card_value(60), 1000)
         self.assertEqual(services.quicksell_value(60), 500)
