@@ -312,6 +312,50 @@ def open_pack(user_id: int, pack_id: int):
     return {"pack_id": pack_id, "pack": pack["display_name"], "cards": [{**dict(card), "value": card_value(card["overall"] or 0), "quicksell_value": quicksell_value(card["overall"] or 0)} for card in selected], "remaining": remaining}
 
 
+
+
+PLAYER_PACKS = {
+    "bronze": {"name": "Bronze Player Pack", "min_overall": 45, "max_overall": 64, "costs": {2: 1000, 5: 2250, 10: 4500}, "card_type": "Standard"},
+    "silver": {"name": "Silver Player Pack", "min_overall": 65, "max_overall": 74, "costs": {2: 4000, 5: 9000, 10: 18000}, "card_type": "Standard"},
+    "gold": {"name": "Gold Player Pack", "min_overall": 75, "max_overall": 99, "costs": {2: 20000, 5: 45000, 10: 90000}, "card_type": "Standard"},
+}
+
+
+def open_player_pack(user_id: int, tier: str, size: int):
+    tier = str(tier or "").lower()
+    if tier == "special":
+        raise GameError("Special Player Packs are coming soon. There are no Special cards available yet.", 409)
+    pack = PLAYER_PACKS.get(tier)
+    if pack is None:
+        raise GameError("Invalid player pack.")
+    if size not in (2, 5, 10):
+        raise GameError("Pack size must be 2, 5, or 10 players.")
+    cost = pack["costs"][size]
+    with transaction() as db:
+        player = db.execute("SELECT coins FROM players WHERE user_id = ?", (user_id,)).fetchone()
+        if player is None:
+            raise GameError("Player not found. Create the player first.", 404)
+        if int(player["coins"] or 0) < cost:
+            raise GameError("Not enough coins to buy this pack.", 409)
+        selected = db.execute(
+            """SELECT * FROM cards
+            WHERE overall BETWEEN ? AND ? AND card_type = ?
+            ORDER BY RANDOM() LIMIT ?""",
+            (pack["min_overall"], pack["max_overall"], pack["card_type"], size),
+        ).fetchall()
+        if len(selected) < size:
+            raise GameError(f"Not enough eligible {tier.title()} players in the card catalog. Need {size}, found {len(selected)}.", 409)
+
+        db.execute("UPDATE players SET coins = COALESCE(coins, 0) - ?, cards_dropped = COALESCE(cards_dropped, 0) + ? WHERE user_id = ?", (cost, size, user_id))
+        for card in selected:
+            edition = db.execute("SELECT COALESCE(copies, 0) + 1 AS edition FROM cards WHERE card_id = ?", (card["card_id"],)).fetchone()["edition"]
+            db.execute("UPDATE cards SET copies = COALESCE(copies, 0) + 1 WHERE card_id = ?", (card["card_id"],))
+            db.execute("INSERT INTO inventories (user_id, card_id, edition) VALUES (?, ?, ?)", (user_id, card["card_id"], edition))
+        balance = db.execute("SELECT coins FROM players WHERE user_id = ?", (user_id,)).fetchone()["coins"]
+
+    cards = [{**dict(card), "value": card_value(card["overall"] or 0), "quicksell_value": quicksell_value(card["overall"] or 0)} for card in selected]
+    return {"tier": tier, "pack": pack["name"], "size": size, "spent": cost, "balance": balance, "cards_received": len(cards), "cards": cards}
+
 def sell_cards(user_id: int, card_ids: list[int]):
     if not card_ids: raise GameError("Select at least one card.")
     if len(card_ids) > 100: raise GameError("You can sell at most 100 cards at once.")
