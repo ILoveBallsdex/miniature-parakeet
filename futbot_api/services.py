@@ -52,7 +52,7 @@ def search_cards(search: str = "", limit: int = 50, offset: int = 0):
 
 
 def search_card_catalog(search: str = "", limit: int = 5, offset: int = 0,
-                        tier: str | None = None, position: str | None = None):
+                        tier=None, position=None):
     """Search the standard-player catalog by pack tier and position, with total count."""
     limit = max(1, min(int(limit), 100))
     offset = max(0, int(offset))
