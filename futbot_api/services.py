@@ -384,26 +384,38 @@ def _match_card_name(rows, player_name):
             return partial[0]
         raise GameError("That name matches multiple players: " + ", ".join(names[:8]) + ". Type more of the name.")
 
-    # Compare against full names and individual name parts. Keep the threshold
-    # high so unrelated or random text is not treated as a player name.
-    max_edits = 1 if len(normalized_query.replace(" ", "")) <= 2 else 2
+    # Allow up to two character edits, but never guess from a distant match.
+    def edit_distance(first, second):
+        previous = list(range(len(second) + 1))
+        for index, char in enumerate(first, 1):
+            current = [index]
+            for column, other in enumerate(second, 1):
+                current.append(min(
+                    current[-1] + 1,
+                    previous[column] + 1,
+                    previous[column - 1] + (char != other),
+                ))
+            previous = current
+        return previous[-1]
+
     scored = []
     for row in rows:
         candidate = normalize(row["name"])
         choices = [candidate, *candidate.split()]
-        best = max((difflib.SequenceMatcher(None, normalized_query, part).ratio() for part in choices), default=0)
-        if abs(len(normalized_query) - len(candidate)) <= max_edits or any(
-            abs(len(normalized_query) - len(part)) <= max_edits for part in candidate.split()
-        ):
-            if best >= 0.78:
-                scored.append((best, row))
-    scored.sort(key=lambda item: item[0], reverse=True)
+        distance = min(
+            (edit_distance(normalized_query, part) for part in choices
+             if abs(len(normalized_query) - len(part)) <= 2),
+            default=99,
+        )
+        if distance <= 2:
+            scored.append((distance, row))
+    scored.sort(key=lambda item: item[0])
     if not scored:
         raise GameError("I couldn't find a player matching that name. Check the spelling and try again.", 404)
-    if len(scored) > 1 and scored[0][0] - scored[1][0] < 0.06:
-        names = list(dict.fromkeys(str(item[1]["name"]) for item in scored[:5]))
+    if len(scored) > 1 and scored[0][0] == scored[1][0]:
+        names = list(dict.fromkeys(str(item[1]["name"]) for item in scored if item[0] == scored[0][0]))
         if len(names) > 1:
-            raise GameError("That could match multiple players: " + ", ".join(names) + ". Type more of the name.")
+            raise GameError("That could match multiple players: " + ", ".join(names[:5]) + ". Type more of the name.")
     return scored[0][1]
 
 
