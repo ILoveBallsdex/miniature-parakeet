@@ -158,7 +158,8 @@ async def player_lineup_image(request):
     # attackers at the top, then midfield, defenders, and the goalkeeper.
     card_width, card_height = 420, 588
     label_height = 460
-    gap_x, padding_x = 56, 100
+    # Keep teammates in the same row far enough apart that their labels never collide.
+    gap_x, padding_x = 190, 120
     row_gap, top_padding = 48, 92
     row_order = ("att", "mid", "def", "gk")
     position_rows = {
@@ -259,16 +260,39 @@ async def player_lineup_image(request):
 
             position_label = f"{slot['position']} ({slot['slot']})"
             if card:
-                name_label = str(card.get("name") or "Unknown")[:23]
+                full_name = " ".join(str(card.get("name") or "Unknown").split())
+                short_names = {
+                    "Vinicius Junior": "Vini Jr.",
+                    "Vinícius Júnior": "Vini Jr.",
+                    "Kylian Mbappe": "Mbappé",
+                    "Kevin De Bruyne": "De Bruyne",
+                    "Virgil van Dijk": "Van Dijk",
+                    "Alexis Mac Allister": "Mac Allister",
+                    "Lautaro Martinez": "Martinez",
+                    "Federico Valverde": "Valverde",
+                    "Jamal Musiala": "Musiala",
+                    "Antoine Griezmann": "Griezmann",
+                    "Mohamed Salah": "Salah",
+                    "Jude Bellingham": "Bellingham",
+                }
+                name_label = short_names.get(full_name, full_name.split()[-1])
+                # Keep even longer surnames inside the width of their own card.
+                name_font_for_player = name_font
+                while draw.textbbox((0, 0), name_label, font=name_font_for_player)[2] > card_width - 12:
+                    current_size = getattr(name_font_for_player, "size", 80)
+                    if current_size <= 28:
+                        break
+                    name_font_for_player = ImageFont.truetype(font_path, current_size - 4)
                 rating_label = f"{card.get('effective_overall', card.get('overall', '—'))} OVR"
             else:
                 name_label = "Empty"
+                name_font_for_player = name_font
                 rating_label = " "
 
             # Align labels with the card itself; remove the previous rightward offset.
             label_center_x = x + card_width // 2
             position_box = draw.textbbox((0, 0), position_label, font=position_font)
-            name_box = draw.textbbox((0, 0), name_label, font=name_font)
+            name_box = draw.textbbox((0, 0), name_label, font=name_font_for_player)
             rating_box = draw.textbbox((0, 0), rating_label, font=small_font)
             draw.text((label_center_x - (position_box[2] - position_box[0]) // 2,
                        y + card_height + 8), position_label,
