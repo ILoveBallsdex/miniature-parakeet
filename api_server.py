@@ -1044,7 +1044,15 @@ async def add_player_lineup(request):
 
 async def remove_player_lineup(request):
     payload = await read_json(request)
-    return success(services.remove_lineup_player(int(request.match_info["user_id"]), payload.get("player", ""), int(payload.get("slot", 0))))
+    return success(services.remove_lineup_player(int(request.match_info["user_id"]), int(payload.get("slot", 0))))
+
+async def swap_player_lineup(request):
+    payload = await read_json(request)
+    return success(services.swap_lineup_players(
+        int(request.match_info["user_id"]),
+        int(payload.get("slot1", 0)),
+        int(payload.get("slot2", 0)),
+    ))
 
 async def set_player_formation(request):
     payload = await read_json(request)
@@ -1105,6 +1113,7 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_get("/api/v1/players/{user_id:\\d+}/lineup/image", player_lineup_image)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/lineup/add", add_player_lineup)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/lineup/remove", remove_player_lineup)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/lineup/swap", swap_player_lineup)
     app.router.add_put("/api/v1/players/{user_id:\\d+}/lineup/formation", set_player_formation)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/decks", player_decks)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/daily/claim", daily_claim)
