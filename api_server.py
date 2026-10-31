@@ -468,6 +468,16 @@ async def sell_cards(request):
     return success(services.sell_cards(user_id, card_ids))
 
 
+async def quicksell_player_card(request):
+    user_id = int(request.match_info["user_id"])
+    payload = await read_json(request)
+    try:
+        card_id = int(payload["card_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("card_id must be an integer.")
+    return success(services.quicksell_card(user_id, card_id))
+
+
 async def toggle_wishlist(request):
     user_id = int(request.match_info["user_id"])
     card_id = int(request.match_info["card_id"])
@@ -1130,6 +1140,7 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_get("/api/v1/players/{user_id:\\d+}/decks", player_decks)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/rewards/daily", daily_reward_claim)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/rewards/quick", quick_reward_claim)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/cards/quicksell", quicksell_player_card)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/daily/claim", daily_claim)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/daily/collect", daily_collect)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/starter-pack", starter_pack)
