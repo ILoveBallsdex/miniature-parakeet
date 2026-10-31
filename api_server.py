@@ -311,7 +311,7 @@ async def player_lineup_image(request):
                     if current_size <= 35:
                         break
                     name_font_for_player = ImageFont.truetype(font_path, current_size - 5)
-                rating_label = f"{card.get('effective_overall', card.get('overall', '—'))} OVR"
+                rating_label = f"{card.get('effective_overall', card.get('overall', '-'))} OVR"
             else:
                 name_label = "Empty"
                 name_font_for_player = name_font
