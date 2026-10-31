@@ -476,6 +476,16 @@ async def toggle_wishlist(request):
     return success(services.toggle_wishlist(user_id, card_id))
 
 
+async def daily_reward_claim(request):
+    user_id = int(request.match_info["user_id"])
+    return success(services.claim_daily_reward(user_id))
+
+
+async def quick_reward_claim(request):
+    user_id = int(request.match_info["user_id"])
+    return success(services.claim_quick_reward(user_id))
+
+
 async def daily_claim(request):
     user_id = int(request.match_info["user_id"])
     if services.get_player(user_id) is None:
@@ -1118,6 +1128,8 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/players/{user_id:\\d+}/lineup/swap", swap_player_lineup)
     app.router.add_put("/api/v1/players/{user_id:\\d+}/lineup/formation", set_player_formation)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/decks", player_decks)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/rewards/daily", daily_reward_claim)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/rewards/quick", quick_reward_claim)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/daily/claim", daily_claim)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/daily/collect", daily_collect)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/starter-pack", starter_pack)
