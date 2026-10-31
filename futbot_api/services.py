@@ -367,6 +367,82 @@ def save_deck(user_id: int, deck_name: str, card_ids: list[int]):
 
 
 
+
+FORMATIONS = {
+ "2-2-3":["GK","LCB","RCB","CM","CM","LW","ST","RW"],
+ "3-2-2":["GK","LCB","CB","RCB","CM","CM","ST","CF"],
+ "2-3-2":["GK","LCB","RCB","CM","CM","CAM","ST","CF"],
+ "4-2-1":["GK","LB","LCB","RCB","RB","CM","CM","ST"],
+ "3-3-1":["GK","LCB","CB","RCB","CM","CM","CAM","ST"],
+}
+POSITION_AREAS={"GK":"gk","CB":"def","LCB":"def","RCB":"def","LB":"def","RB":"def","LWB":"def","RWB":"def","CDM":"mid","CM":"mid","CAM":"mid","LM":"mid","RM":"mid","LW":"att","RW":"att","ST":"att","CF":"att"}
+POSITION_EQUIVALENTS={"CB":"CB","LCB":"CB","RCB":"CB","ST":"ST","CF":"ST"}
+
+def position_penalty(natural_position, slot_position):
+ n=(natural_position or "").upper().strip(); p=(slot_position or "").upper().strip()
+ if POSITION_EQUIVALENTS.get(n,n)==POSITION_EQUIVALENTS.get(p,p): return 0
+ a,b=POSITION_AREAS.get(n),POSITION_AREAS.get(p)
+ if a and a==b: return 3
+ if {a,b} in ({"def","mid"},{"mid","att"}): return 10
+ return 30
+
+def _lineup_data(db,user_id):
+ row=db.execute("SELECT formation,slots FROM lineups WHERE user_id=?",(user_id,)).fetchone()
+ formation=row["formation"] if row else "2-2-3"; slots=json.loads(row["slots"]) if row else {}
+ result=[]
+ for number,pos in enumerate(FORMATIONS[formation],1):
+  cid=slots.get(str(number)); rowcard=db.execute("SELECT * FROM cards WHERE card_id=?",(cid,)).fetchone() if cid else None
+  card=dict(rowcard) if rowcard else None
+  if card:
+   penalty=position_penalty(card.get("position"),pos)
+   card.update({"slot":number,"slot_position":pos,"position_penalty":penalty,"effective_overall":max(0,int(card.get("overall") or 0)-penalty)})
+  result.append({"slot":number,"position":pos,"card":card})
+ return {"user_id":user_id,"formation":formation,"slots":result,"filled":sum(bool(x["card"]) for x in result)}
+
+def get_lineup(user_id):
+ with read_connection() as db:
+  if not db.execute("SELECT 1 FROM players WHERE user_id=?",(user_id,)).fetchone(): raise GameError("Player not found. Register first.",404)
+  return _lineup_data(db,user_id)
+
+def add_lineup_player(user_id,player_name,slot):
+ slot=int(slot)
+ if not 1<=slot<=8: raise GameError("Slot must be from 1 to 8.")
+ with transaction() as db:
+  row=db.execute("SELECT formation,slots FROM lineups WHERE user_id=?",(user_id,)).fetchone()
+  formation=row["formation"] if row else "2-2-3"; slots=json.loads(row["slots"]) if row else {}
+  card=db.execute("SELECT c.card_id FROM cards c JOIN inventories i ON i.card_id=c.card_id WHERE i.user_id=? AND lower(c.name)=lower(?) ORDER BY c.overall DESC LIMIT 1",(user_id,str(player_name).strip())).fetchone()
+  if not card: raise GameError("You don't own that player. Enter the exact player name.",404)
+  cid=int(card["card_id"])
+  if str(slot) in slots and int(slots[str(slot)])!=cid: raise GameError("That slot is occupied. Remove its player first.",409)
+  if str(cid) in [str(v) for k,v in slots.items() if k!=str(slot)]: raise GameError("That player is already in your lineup.",409)
+  slots[str(slot)]=cid
+  db.execute("INSERT INTO lineups(user_id,formation,slots) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET slots=excluded.slots",(user_id,formation,json.dumps(slots)))
+  return _lineup_data(db,user_id)
+
+def remove_lineup_player(user_id,player_name,slot):
+ slot=int(slot)
+ if not 1<=slot<=8: raise GameError("Slot must be from 1 to 8.")
+ with transaction() as db:
+  row=db.execute("SELECT formation,slots FROM lineups WHERE user_id=?",(user_id,)).fetchone()
+  if not row: raise GameError("You don't have a lineup yet.",404)
+  slots=json.loads(row["slots"]); cid=slots.get(str(slot))
+  if cid is None: raise GameError("That slot is empty.",404)
+  card=db.execute("SELECT name FROM cards WHERE card_id=?",(cid,)).fetchone()
+  if not card or card["name"].lower()!=str(player_name).strip().lower(): raise GameError("Player name doesn't match the player in that slot.",409)
+  del slots[str(slot)]
+  db.execute("UPDATE lineups SET slots=? WHERE user_id=?",(json.dumps(slots),user_id))
+  return _lineup_data(db,user_id)
+
+def set_lineup_formation(user_id,formation):
+ formation=str(formation or "").strip()
+ if formation not in FORMATIONS: raise GameError("Choose one of: "+", ".join(FORMATIONS))
+ with transaction() as db:
+  row=db.execute("SELECT slots FROM lineups WHERE user_id=?",(user_id,)).fetchone()
+  slots=json.loads(row["slots"]) if row else {}
+  db.execute("INSERT INTO lineups(user_id,formation,slots) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET formation=excluded.formation",(user_id,formation,json.dumps(slots)))
+  return _lineup_data(db,user_id)
+
+
 def _weighted_card_rows(db, excluded_ids=()):
     rows = db.execute("SELECT * FROM cards ORDER BY card_id").fetchall()
     weighted = []
