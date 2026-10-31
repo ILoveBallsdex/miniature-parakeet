@@ -55,16 +55,38 @@ def search_cards(search: str = "", limit: int = 50, offset: int = 0):
 # --------------------------- Admin card catalog ------------------------------
 
 CARD_FIELDS = (
-    "player_id", "name", "attack", "defense", "speed", "height", "club",
-    "position", "overall", "image_path", "card_rarity", "card_type", "league", "nation",
+    "player_id", "name", "attack", "defense", "speed",
+    "shooting", "passing", "dribbling", "goalkeeping",
+    "height", "club", "position", "overall", "image_path",
+    "card_rarity", "card_type", "league", "nation",
 )
-CARD_INTEGER_FIELDS = {"attack", "defense", "speed", "overall"}
+CARD_INTEGER_FIELDS = {"attack", "defense", "speed", "shooting", "passing", "dribbling", "goalkeeping", "overall"}
+
+
+def calculate_overall(position: str, shooting=0, passing=0, dribbling=0, defense=0, goalkeeping=0) -> int:
+    """Calculate OVR with weights that change based on the player's position."""
+    position = str(position or "").upper()
+    if position == "GK":
+        return max(1, min(99, round(float(goalkeeping or 0))))
+    weights = {
+        "ST": (0.45, 0.15, 0.30, 0.10), "CF": (0.35, 0.30, 0.25, 0.10),
+        "LW": (0.30, 0.20, 0.35, 0.15), "RW": (0.30, 0.20, 0.35, 0.15),
+        "CAM": (0.25, 0.35, 0.30, 0.10), "CM": (0.15, 0.35, 0.25, 0.25),
+        "CDM": (0.10, 0.30, 0.20, 0.40), "LM": (0.20, 0.25, 0.35, 0.20),
+        "RM": (0.20, 0.25, 0.35, 0.20), "LB": (0.05, 0.15, 0.15, 0.65),
+        "LWB": (0.05, 0.20, 0.25, 0.50), "CB": (0.05, 0.15, 0.10, 0.70),
+        "LCB": (0.05, 0.15, 0.10, 0.70), "RCB": (0.05, 0.15, 0.10, 0.70),
+        "RB": (0.05, 0.15, 0.15, 0.65), "RWB": (0.05, 0.20, 0.25, 0.50),
+    }
+    weights_for_position = weights.get(position, (0.20, 0.25, 0.25, 0.30))
+    stats = (shooting, passing, dribbling, defense)
+    return max(1, min(99, round(sum(float(value or 0) * weight for value, weight in zip(stats, weights_for_position)))))
 
 
 def _clean_catalog_card(payload: dict, creating: bool):
     if not isinstance(payload, dict):
         raise GameError("Card data must be an object.")
-    required = ("card_id", "name", "attack", "defense", "speed", "overall", "card_rarity", "card_type")
+    required = ("card_id", "name", "card_rarity", "card_type", "position")
     if creating:
         missing = [field for field in required if field not in payload or payload[field] is None]
         if missing:
@@ -95,6 +117,32 @@ def _clean_catalog_card(payload: dict, creating: bool):
         if not isinstance(value, str) or not value.strip():
             raise GameError(f"{field} must be a non-empty string.")
         result[field] = value.strip()[:100]
+
+    # Keep older integrations working while calculating from the new stats.
+    if "shooting" not in result and "attack" in result:
+        result["shooting"] = result["attack"]
+    if "dribbling" not in result and "speed" in result:
+        result["dribbling"] = result["speed"]
+    if "passing" not in result:
+        result["passing"] = round((result.get("shooting", 0) + result.get("defense", 0)) / 2)
+    position = str(result.get("position", payload.get("position", ""))).upper()
+    if position == "GK":
+        if "goalkeeping" not in result:
+            result["goalkeeping"] = result.get("defense", 0)
+    else:
+        result.setdefault("goalkeeping", 0)
+        if creating:
+            missing_stats = [field for field in ("shooting", "passing", "dribbling", "defense") if field not in result]
+            if missing_stats:
+                raise GameError("Missing player stats: " + ", ".join(missing_stats))
+    if position == "GK" and creating and "goalkeeping" not in result:
+        raise GameError("Goalkeepers require the goalkeeping stat.")
+    if creating or "position" in result or any(field in result for field in ("shooting", "passing", "dribbling", "defense", "goalkeeping")):
+        result["overall"] = calculate_overall(
+            position, result.get("shooting", 0), result.get("passing", 0),
+            result.get("dribbling", 0), result.get("defense", 0),
+            result.get("goalkeeping", 0),
+        )
     if creating:
         result.setdefault("player_id", str(result["card_id"]))
     return result
