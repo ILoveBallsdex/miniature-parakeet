@@ -302,15 +302,17 @@ async def player_lineup_image(request):
         if row_name == "mid":
             row_y += 500
         elif row_name == "def":
-            # Align the defensive line just above the goalkeeper.
-            row_y += 1800
+            # Raise a three-player back line slightly so it sits farther
+            # above the goalkeeper while remaining well below the CDM.
+            row_y += 1450 if len(row) == 3 else 1800
         elif row_name == "gk":
             row_y += 400
         count = len(row)
         # Give center-backs more room around the goalkeeper while keeping
         # the fullbacks within the visible pitch area in both formations.
         if row_name == "def" and count == 4:
-            row_gap_x = 500
+            # Spread both center-backs and fullbacks farther across the pitch.
+            row_gap_x = 700
         elif row_name == "def" and count == 3:
             row_gap_x = 1050
         else:
