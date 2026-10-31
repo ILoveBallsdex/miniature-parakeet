@@ -196,14 +196,14 @@ async def player_lineup_image(request):
         position_font = ImageFont.truetype(font_path, 150)
         name_font = ImageFont.truetype(font_path, 80)
         small_font = ImageFont.truetype(font_path, 72)
-        badge_font = ImageFont.truetype(font_path, 32)
-        title_font = ImageFont.truetype(font_path, 42)
+        badge_font = ImageFont.truetype(font_path, 56)
+        title_font = ImageFont.truetype(font_path, 72)
     except OSError:
         position_font = ImageFont.load_default(size=150)
         name_font = ImageFont.load_default(size=80)
         small_font = ImageFont.load_default(size=72)
-        badge_font = ImageFont.load_default(size=32)
-        title_font = ImageFont.load_default(size=42)
+        badge_font = ImageFont.load_default(size=56)
+        title_font = ImageFont.load_default(size=72)
 
     # Pitch markings.
     draw.rectangle((14, 14, canvas_width - 14, canvas_height - 14), outline=(220, 242, 225), width=3)
@@ -216,7 +216,8 @@ async def player_lineup_image(request):
                     canvas_width // 2 + 180, canvas_height - 14), outline=(220, 242, 225), width=2)
     title = f"{lineup.get('formation', '2-2-3')} FORMATION"
     title_box = draw.textbbox((0, 0), title, font=title_font)
-    draw.text(((canvas_width - (title_box[2] - title_box[0])) // 2, 30),
+    title_width = title_box[2] - title_box[0]
+    draw.text((canvas_width - title_width - 42, 30),
               title, font=title_font, fill=(255, 255, 255))
 
     for row_index, row_name in enumerate(row_order):
@@ -242,14 +243,15 @@ async def player_lineup_image(request):
                     if penalty > 0:
                         badge_text = f"-{penalty}"
                         bounds = draw.textbbox((0, 0), badge_text, font=badge_font)
-                        badge_w = bounds[2] - bounds[0] + 20
-                        badge_h = bounds[3] - bounds[1] + 14
-                        bx, by = x + card_width - badge_w - 6, y + 6
+                        badge_w = bounds[2] - bounds[0] + 48
+                        badge_h = bounds[3] - bounds[1] + 36
+                        bx, by = x + card_width - badge_w - 10, y + 10
                         draw.rounded_rectangle((bx, by, bx + badge_w, by + badge_h),
-                                               radius=9, fill=(210, 35, 45),
-                                               outline=(255, 255, 255), width=2)
-                        draw.text((bx + 10, by + 5), badge_text,
-                                  font=badge_font, fill=(255, 255, 255))
+                                               radius=18, fill=(210, 25, 38),
+                                               outline=(255, 255, 255), width=5)
+                        draw.text((bx + 24, by + 16), badge_text,
+                                  font=badge_font, fill=(255, 255, 255),
+                                  stroke_width=1, stroke_fill=(120, 0, 0))
                 except Exception:
                     card = None
             else:
