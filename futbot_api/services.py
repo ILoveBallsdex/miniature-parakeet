@@ -188,26 +188,23 @@ def delete_catalog_card(card_id: int):
         "updated_pending_rewards": pending_removed,
     }
 
-def wipe_all_players():
-    """Remove every player profile and player-owned test record, but keep the card catalog."""
+def wipe_all_catalog_cards():
+    """Delete every catalog card and every saved reference to cards, preserving player accounts."""
     tables = (
-        "inventories", "decks", "user_achievements", "wishlists", "packs",
-        "pending_daily_rewards", "battles", "trade_offers", "exchange_sessions",
-        "drop_sessions", "market_listings", "friendships", "friend_requests",
+        "inventories", "decks", "wishlists", "pending_daily_rewards",
+        "market_listings", "drop_sessions", "trade_offers", "exchange_sessions", "battles",
     )
     with transaction() as db:
         counts = {}
         for table in tables:
             counts[table] = db.execute(f"DELETE FROM {table}").rowcount
-        counts["players"] = db.execute("DELETE FROM players").rowcount
-        db.execute("""UPDATE cards SET copies = 0, total_battles_played = 0,
-            total_battles_won = 0, total_rounds_played = 0, total_rounds_won = 0,
-            wishlist_count = 0""")
+        counts["catalog_cards"] = db.execute("DELETE FROM cards").rowcount
     return {
         "wiped": True,
-        "player_profiles": counts["players"],
-        "deleted_records": {key: value for key, value in counts.items() if key != "players"},
-        "catalog_cards_kept": True,
+        "catalog_cards_deleted": counts["catalog_cards"],
+        "player_accounts_preserved": True,
+        "player_profiles_preserved": True,
+        "deleted_references": {key: value for key, value in counts.items() if key != "catalog_cards"},
     }
 
 
