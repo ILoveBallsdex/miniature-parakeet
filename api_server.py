@@ -307,13 +307,14 @@ async def player_lineup_image(request):
         elif row_name == "gk":
             row_y += 400
         count = len(row)
-        # Keep a four-player back line compact so the fullbacks stay
-        # close to the center-backs and remain comfortably inside the pitch.
+        # Give center-backs more room around the goalkeeper while keeping
+        # the fullbacks within the visible pitch area in both formations.
         if row_name == "def" and count == 4:
-            row_gap_x = 300
+            row_gap_x = 500
+        elif row_name == "def" and count == 3:
+            row_gap_x = 1050
         else:
-            # Three-player back lines can use the wider spacing.
-            row_gap_x = 1300 if row_name == "def" else gap_x
+            row_gap_x = gap_x
         total_width = count * card_width + max(0, count - 1) * row_gap_x
         # Center each line of players on the pitch.
         start_x = (canvas_width - total_width) // 2 - 15
