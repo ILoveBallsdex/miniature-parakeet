@@ -1,3 +1,4 @@
+# Small note: keep lineup rendering predictable across deployments.
 """
 FutBot HTTP API.
 
