@@ -196,14 +196,14 @@ async def player_lineup_image(request):
         position_font = ImageFont.truetype(font_path, 150)
         name_font = ImageFont.truetype(font_path, 80)
         small_font = ImageFont.truetype(font_path, 72)
-        badge_font = ImageFont.truetype(font_path, 56)
-        title_font = ImageFont.truetype(font_path, 72)
+        badge_font = ImageFont.truetype(font_path, 84)
+        title_font = ImageFont.truetype(font_path, 110)
     except OSError:
         position_font = ImageFont.load_default(size=150)
         name_font = ImageFont.load_default(size=80)
         small_font = ImageFont.load_default(size=72)
-        badge_font = ImageFont.load_default(size=56)
-        title_font = ImageFont.load_default(size=72)
+        badge_font = ImageFont.load_default(size=84)
+        title_font = ImageFont.load_default(size=110)
 
     # Pitch markings.
     draw.rectangle((14, 14, canvas_width - 14, canvas_height - 14), outline=(220, 242, 225), width=3)
@@ -243,13 +243,13 @@ async def player_lineup_image(request):
                     if penalty > 0:
                         badge_text = f"-{penalty}"
                         bounds = draw.textbbox((0, 0), badge_text, font=badge_font)
-                        badge_w = bounds[2] - bounds[0] + 48
-                        badge_h = bounds[3] - bounds[1] + 36
+                        badge_w = bounds[2] - bounds[0] + 64
+                        badge_h = bounds[3] - bounds[1] + 52
                         bx, by = x + card_width - badge_w - 10, y + 10
                         draw.rounded_rectangle((bx, by, bx + badge_w, by + badge_h),
-                                               radius=18, fill=(210, 25, 38),
-                                               outline=(255, 255, 255), width=5)
-                        draw.text((bx + 24, by + 16), badge_text,
+                                               radius=24, fill=(210, 25, 38),
+                                               outline=(255, 255, 255), width=7)
+                        draw.text((bx + 32, by + 24), badge_text,
                                   font=badge_font, fill=(255, 255, 255),
                                   stroke_width=1, stroke_fill=(120, 0, 0))
                 except Exception:
