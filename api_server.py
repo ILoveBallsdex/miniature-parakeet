@@ -195,7 +195,7 @@ async def player_lineup_image(request):
 
     # Use a compact four-row layout so the cards occupy most of the Discord embed.
     card_width, card_height = 900, 1260
-    label_height = 330
+    label_height = 540
     gap_x, padding_x = 300, 150
     row_gap, top_padding = 0, 440
     row_order = ("att", "cam", "mid", "cdm", "def", "gk")
@@ -226,7 +226,7 @@ async def player_lineup_image(request):
 
     # Keep a 2:3 image ratio for Discord while giving each card much more space.
     canvas_width = 4800
-    canvas_height = 10000
+    canvas_height = 11250
     row_height = card_height + label_height
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
     draw = ImageDraw.Draw(canvas)
@@ -340,14 +340,14 @@ async def player_lineup_image(request):
             name_box = draw.textbbox((0, 0), name_label, font=name_font_for_player)
             rating_box = draw.textbbox((0, 0), rating_label, font=small_font)
             draw.text((label_center_x - (position_box[2] - position_box[0]) // 2,
-                       y + card_height + 10), position_label,
+                       y + card_height + 0), position_label,
                       font=position_font, fill=(255, 255, 255),
                       stroke_width=1, stroke_fill=(20, 45, 30))
             draw.text((label_center_x - (name_box[2] - name_box[0]) // 2,
-                       y + card_height + 155), name_label,
+                       y + card_height + 220), name_label,
                       font=name_font, fill=(255, 255, 255))
             draw.text((label_center_x - (rating_box[2] - rating_box[0]) // 2,
-                       y + card_height + 255), rating_label,
+                       y + card_height + 380), rating_label,
                       font=small_font, fill=(235, 245, 235))
 
     # Keep the generated image at its native dimensions to limit Railway memory use.
