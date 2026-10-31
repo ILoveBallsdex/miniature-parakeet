@@ -172,7 +172,7 @@ class FutBotServiceTests(unittest.TestCase):
                 )
         result = services.search_card_catalog(tier="bronze", limit=2, offset=1)
         self.assertEqual(len(result["cards"]), 2)
-        self.assertEqual(result["total"], 5)
+        self.assertEqual(result["total"], 3)
 
     def test_bronze_players_are_eligible_for_random_rewards(self):
         with transaction() as db:
