@@ -125,6 +125,15 @@ class FutBotServiceTests(unittest.TestCase):
         self.assertEqual(result["coins_earned"], services.card_value(92) // 2)
         self.assertEqual(services.get_player(123)["coins"], services.card_value(92) // 2)
 
+    def test_bronze_players_are_eligible_for_random_rewards(self):
+        with transaction() as db:
+            db.execute(
+                "INSERT INTO cards (card_id, name, overall, card_type, card_rarity, copies) VALUES (40, 'Bronze Player', 63, 'Standard', 'Common', 0)"
+            )
+            weighted = services._weighted_card_rows(db)
+        bronze = next((weight for card, weight in weighted if card["card_id"] == 40), None)
+        self.assertEqual(bronze, 10)
+
     def test_quick_reward_includes_quicksell_preview_value(self):
         reward = services.claim_quick_reward(123)
         self.assertEqual(len(reward["cards"]), 1)
