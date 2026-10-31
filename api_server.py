@@ -875,6 +875,22 @@ async def delete_player_deck(request):
     return success(services.delete_deck(user_id, name))
 
 
+
+async def player_lineup(request):
+    return success(services.get_lineup(int(request.match_info["user_id"])))
+
+async def add_player_lineup(request):
+    payload = await read_json(request)
+    return success(services.add_lineup_player(int(request.match_info["user_id"]), payload.get("player", ""), int(payload.get("slot", 0))))
+
+async def remove_player_lineup(request):
+    payload = await read_json(request)
+    return success(services.remove_lineup_player(int(request.match_info["user_id"]), payload.get("player", ""), int(payload.get("slot", 0))))
+
+async def set_player_formation(request):
+    payload = await read_json(request)
+    return success(services.set_lineup_formation(int(request.match_info["user_id"]), payload.get("formation", "")))
+
 async def player_decks(request):
     user_id = int(request.match_info["user_id"])
     if services.get_player(user_id) is None:
@@ -926,6 +942,10 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_get("/api/v1/players/{user_id:\\d+}/cards/{card_id:\\d+}/copies", owned_card_copies)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/cards/{card_id:\\d+}/minted", minted_card_image)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/packs", player_packs)
+    app.router.add_get("/api/v1/players/{user_id:\\d+}/lineup", player_lineup)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/lineup/add", add_player_lineup)
+    app.router.add_post("/api/v1/players/{user_id:\\d+}/lineup/remove", remove_player_lineup)
+    app.router.add_put("/api/v1/players/{user_id:\\d+}/lineup/formation", set_player_formation)
     app.router.add_get("/api/v1/players/{user_id:\\d+}/decks", player_decks)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/daily/claim", daily_claim)
     app.router.add_post("/api/v1/players/{user_id:\\d+}/daily/collect", daily_collect)
