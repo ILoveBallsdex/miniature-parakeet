@@ -748,6 +748,14 @@ def select_battle_lineup(battle_id: str, user_id: int):
             "formation": formation,
             "slots": lineup_snapshot,
         }
+        state[prefix + "_effective_overall"] = {
+            str(item["card"]["card_id"]): item["card"]["effective_overall"]
+            for item in lineup_snapshot
+        }
+        state[prefix + "_position_penalties"] = {
+            str(item["card"]["card_id"]): item["card"]["position_penalty"]
+            for item in lineup_snapshot
+        }
         if state["p1_deck"] and state["p2_deck"]:
             state["phase"] = "ACTION"
         db.execute(
