@@ -188,6 +188,29 @@ def delete_catalog_card(card_id: int):
         "updated_pending_rewards": pending_removed,
     }
 
+def wipe_all_players():
+    """Remove every player profile and player-owned test record, but keep the card catalog."""
+    tables = (
+        "inventories", "decks", "user_achievements", "wishlists", "packs",
+        "pending_daily_rewards", "battles", "trade_offers", "exchange_sessions",
+        "drop_sessions", "market_listings", "friendships", "friend_requests",
+    )
+    with transaction() as db:
+        counts = {}
+        for table in tables:
+            counts[table] = db.execute(f"DELETE FROM {table}").rowcount
+        counts["players"] = db.execute("DELETE FROM players").rowcount
+        db.execute("""UPDATE cards SET copies = 0, total_battles_played = 0,
+            total_battles_won = 0, total_rounds_played = 0, total_rounds_won = 0,
+            wishlist_count = 0""")
+    return {
+        "wiped": True,
+        "player_profiles": counts["players"],
+        "deleted_records": {key: value for key, value in counts.items() if key != "players"},
+        "catalog_cards_kept": True,
+    }
+
+
 def ensure_player(user_id: int, name: str):
     if user_id <= 0 or not name.strip():
         raise GameError("A valid user ID and display name are required.")
