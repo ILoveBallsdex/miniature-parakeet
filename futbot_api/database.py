@@ -209,6 +209,8 @@ def init_database() -> None:
         }
         for card in db.execute("SELECT card_id, position, shooting, passing, dribbling, defense, goalkeeping FROM cards").fetchall():
             position = str(card["position"] or "").upper()
+            if not position:
+                continue
             if position == "GK":
                 rating = int(card["goalkeeping"] or 0)
             else:
