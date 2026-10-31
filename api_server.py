@@ -191,20 +191,18 @@ async def player_lineup_image(request):
     user_id = int(request.match_info["user_id"])
     lineup = services.get_lineup(user_id)
     from io import BytesIO
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-    # Arrange the saved formation as a vertical football pitch:
-    # attackers at the top, then midfield, defenders, and the goalkeeper.
-    card_width, card_height = 700, 980
-    label_height = 700
-    # Keep teammates in the same row far enough apart that their labels never collide.
-    gap_x, padding_x = 400, 350
-    row_gap, top_padding = 55, 130
-    row_order = ("att", "cam", "mid", "cdm", "def", "gk")
+    # Use a compact four-row layout so the cards occupy most of the Discord embed.
+    card_width, card_height = 1000, 1400
+    label_height = 330
+    gap_x, padding_x = 180, 120
+    row_gap, top_padding = 0, 250
+    row_order = ("att", "mid", "def", "gk")
     position_rows = {
         "GK": "gk",
         "LB": "def", "CB": "def", "RB": "def",
-        "CDM": "cdm", "CM": "mid", "CAM": "cam",
+        "CDM": "mid", "CM": "mid", "CAM": "mid",
         "LW": "att", "ST": "att", "CF": "att", "RW": "att",
     }
     rows = {name: [] for name in row_order}
@@ -223,30 +221,37 @@ async def player_lineup_image(request):
                     int(item["slot"]),
                 )
             )
+        elif row_name == "mid":
+            midfield_order = {"CAM": 0, "CM": 1, "CDM": 2}
+            rows[row_name].sort(
+                key=lambda item: (
+                    midfield_order.get(str(item.get("position") or "").upper(), 1),
+                    int(item["slot"]),
+                )
+            )
         else:
             rows[row_name].sort(key=lambda item: int(item["slot"]))
 
-    # Every formation uses the exact same large pitch dimensions.
-    # Player count only changes their positions within a row, never the pitch size.
-    canvas_width = 7200
-    canvas_height = 10800
+    # Keep a 2:3 image ratio for Discord while giving each card much more space.
+    canvas_width = 4800
+    canvas_height = 7200
     row_height = card_height + label_height
     canvas = Image.new("RGB", (canvas_width, canvas_height), (30, 105, 66))
     draw = ImageDraw.Draw(canvas)
 
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        position_font = ImageFont.truetype(font_path, 250)
+        position_font = ImageFont.truetype(font_path, 180)
         name_font = ImageFont.truetype(font_path, 135)
-        small_font = ImageFont.truetype(font_path, 120)
-        badge_font = ImageFont.truetype(font_path, 140)
-        title_font = ImageFont.truetype(font_path, 185)
+        small_font = ImageFont.truetype(font_path, 115)
+        badge_font = ImageFont.truetype(font_path, 150)
+        title_font = ImageFont.truetype(font_path, 180)
     except OSError:
-        position_font = ImageFont.load_default(size=250)
+        position_font = ImageFont.load_default(size=180)
         name_font = ImageFont.load_default(size=135)
-        small_font = ImageFont.load_default(size=120)
-        badge_font = ImageFont.load_default(size=140)
-        title_font = ImageFont.load_default(size=185)
+        small_font = ImageFont.load_default(size=115)
+        badge_font = ImageFont.load_default(size=150)
+        title_font = ImageFont.load_default(size=180)
 
     # Pitch markings.
     draw.rectangle((14, 14, canvas_width - 14, canvas_height - 14), outline=(220, 242, 225), width=4)
@@ -260,8 +265,13 @@ async def player_lineup_image(request):
     title = f"{lineup.get('formation', '2-2-3')} FORMATION"
     title_box = draw.textbbox((0, 0), title, font=title_font)
     title_width = title_box[2] - title_box[0]
-    draw.text((canvas_width - title_width - 52, 38),
+    draw.text(((canvas_width - title_width) // 2, 18),
               title, font=title_font, fill=(255, 255, 255))
+    subtitle = f"{lineup.get('filled', 0)}/8 PLAYERS"
+    subtitle_box = draw.textbbox((0, 0), subtitle, font=small_font)
+    subtitle_width = subtitle_box[2] - subtitle_box[0]
+    draw.text(((canvas_width - subtitle_width) // 2, 190),
+              subtitle, font=small_font, fill=(235, 245, 235))
 
     for row_index, row_name in enumerate(row_order):
         row = rows[row_name]
@@ -276,11 +286,12 @@ async def player_lineup_image(request):
             if card and card.get("image_path"):
                 try:
                     with Image.open(resolve_asset_path(card["image_path"])) as source:
-                        artwork = source.convert("RGB")
-                    artwork.thumbnail((card_width, card_height), Image.Resampling.LANCZOS)
-                    card_image = Image.new("RGB", (card_width, card_height), (38, 41, 50))
-                    card_image.paste(artwork, ((card_width - artwork.width) // 2,
-                                               (card_height - artwork.height) // 2))
+                        artwork = ImageOps.fit(
+                        source.convert("RGB"),
+                        (card_width, card_height),
+                        method=Image.Resampling.LANCZOS,
+                    )
+                    card_image = artwork
                     canvas.paste(card_image, (x, y))
                     penalty = int(card.get("position_penalty") or 0)
                     if penalty > 0:
@@ -341,14 +352,13 @@ async def player_lineup_image(request):
                       font=position_font, fill=(255, 255, 255),
                       stroke_width=1, stroke_fill=(20, 45, 30))
             draw.text((label_center_x - (name_box[2] - name_box[0]) // 2,
-                       y + card_height + 350), name_label,
+                       y + card_height + 155), name_label,
                       font=name_font, fill=(255, 255, 255))
             draw.text((label_center_x - (rating_box[2] - rating_box[0]) // 2,
-                       y + card_height + 500), rating_label,
+                       y + card_height + 255), rating_label,
                       font=small_font, fill=(235, 245, 235))
 
-    # Keep the generated image at its native dimensions. The previous
-    # extra 2x resize created enormous images and could exhaust Railway memory.
+    # Keep the generated image at its native dimensions to limit Railway memory use.
     output = BytesIO()
     canvas.save(output, format="PNG", optimize=True)
     return web.Response(body=output.getvalue(), content_type="image/png")
