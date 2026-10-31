@@ -806,7 +806,8 @@ def _weighted_card_rows(db, excluded_ids=()):
         card_type = card["card_type"] or ""
         weight = 0
         if card_type == "Standard":
-            if 70 <= overall <= 79: weight = 70
+            if 0 < overall <= 64: weight = 10  # Bronze players: possible, but uncommon.
+            elif 70 <= overall <= 79: weight = 70
             elif 80 <= overall <= 85: weight = 20
             elif 86 <= overall <= 90: weight = 7
             elif overall > 90: weight = 3
@@ -2297,7 +2298,8 @@ def get_card_weight(search: str):
             if not total:
                 raise GameError("The card catalog is empty.", 409)
             overall = card["overall"] or 0
-            if 70 <= overall <= 79: weight = 70
+            if 0 < overall <= 64: weight = 10
+            elif 70 <= overall <= 79: weight = 70
             elif 80 <= overall <= 85: weight = 20
             elif 86 <= overall <= 90: weight = 7
             elif overall > 90: weight = 3
