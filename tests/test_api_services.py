@@ -138,6 +138,42 @@ class FutBotServiceTests(unittest.TestCase):
         self.assertEqual(slots[7]["card_id"], 1)
         self.assertEqual(result["filled"], 1)
 
+
+    def test_card_catalog_filters_tier_position_and_returns_values_and_total(self):
+        with transaction() as db:
+            db.execute(
+                "INSERT INTO cards (card_id, name, overall, position, card_type, card_rarity, copies) VALUES (50, 'Bronze ST', 64, 'ST', 'Standard', 'Common', 0)"
+            )
+            db.execute(
+                "INSERT INTO cards (card_id, name, overall, position, card_type, card_rarity, copies) VALUES (51, 'Bronze CM', 60, 'CM', 'Standard', 'Common', 0)"
+            )
+            db.execute(
+                "INSERT INTO cards (card_id, name, overall, position, card_type, card_rarity, copies) VALUES (52, 'Silver ST', 70, 'ST', 'Standard', 'Uncommon', 0)"
+            )
+
+        result = services.search_card_catalog(tier="bronze", position="ST", limit=5, offset=0)
+        self.assertEqual(result["total"], 1)
+        self.assertEqual([card["card_id"] for card in result["cards"]], [50])
+        self.assertEqual(result["cards"][0]["value"], services.card_value(64))
+        self.assertEqual(result["cards"][0]["quicksell_value"], services.quicksell_value(64))
+
+        silver = services.search_card_catalog(tier="silver", position="ST")
+        self.assertEqual([card["card_id"] for card in silver["cards"]], [52])
+
+        special = services.search_card_catalog(tier="special")
+        self.assertEqual(special, {"cards": [], "total": 0})
+
+    def test_card_catalog_pagination_keeps_total_count(self):
+        with transaction() as db:
+            for card_id, overall in ((60, 64), (61, 63), (62, 62)):
+                db.execute(
+                    "INSERT INTO cards (card_id, name, overall, position, card_type, card_rarity, copies) VALUES (?, ?, ?, 'ST', 'Standard', 'Common', 0)",
+                    (card_id, f"Bronze {card_id}", overall),
+                )
+        result = services.search_card_catalog(tier="bronze", limit=2, offset=1)
+        self.assertEqual(len(result["cards"]), 2)
+        self.assertEqual(result["total"], 4)
+
     def test_bronze_players_are_eligible_for_random_rewards(self):
         with transaction() as db:
             db.execute(
