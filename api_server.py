@@ -548,6 +548,18 @@ def require_admin(admin_id: int):
         raise services.GameError("You are not authorized to use this admin action.", 403)
 
 
+async def admin_wipe_players(request):
+    payload = await read_json(request)
+    try:
+        admin_id = int(payload["admin_id"])
+    except (KeyError, TypeError, ValueError):
+        raise services.GameError("admin_id is required.")
+    require_admin(admin_id)
+    if payload.get("confirmation") != "WIPE ALL PLAYERS":
+        raise services.GameError('Type the exact confirmation "WIPE ALL PLAYERS" to continue.', 400)
+    return success(services.wipe_all_players())
+
+
 async def admin_give_coins(request):
     payload = await read_json(request)
     try:
@@ -961,6 +973,7 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_post("/api/v1/battles/{battle_id}/next", battle_next_round)
     app.router.add_post("/api/v1/battles/{battle_id}/draw", battle_draw)
     app.router.add_post("/api/v1/battles/{battle_id}/surrender", battle_surrender)
+    app.router.add_post("/api/v1/admin/players/wipe", admin_wipe_players)
     app.router.add_post("/api/v1/admin/coins", admin_give_coins)
     app.router.add_post("/api/v1/admin/cards/give", admin_give_card)
     app.router.add_post("/api/v1/admin/cards/remove", admin_remove_card)
