@@ -341,7 +341,7 @@ async def player_lineup_image(request):
             y = row_y
             if row_name == "gk":
                 # Offset the goalkeeper horizontally from the central CB.
-                x += 450
+                x += 350
             if row_name == "att" and position == "CF":
                 y += 250
 
@@ -358,7 +358,7 @@ async def player_lineup_image(request):
                     cm_index += 1
                 elif position in ("CAM", "CDM"):
                     x = canvas_width // 2 - card_width // 2
-                    y = row_y - 300 if position == "CAM" else row_y + 900
+                    y = row_y - 450 if position == "CAM" else row_y + 900
 
             card = slot.get("card")
             if card and card.get("image_path"):
