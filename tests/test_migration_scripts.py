@@ -59,6 +59,10 @@ class MigrationScriptTests(unittest.TestCase):
         db = sqlite3.connect(target)
         card = db.execute("SELECT name, copies, total_battles_played, wishlist_count FROM cards WHERE card_id = 1").fetchone()
         self.assertEqual(card, ("Catalog Card", 0, 0, 0))
+        stats = db.execute(
+            "SELECT shooting, passing, dribbling, goalkeeping FROM cards WHERE card_id = 1"
+        ).fetchone()
+        self.assertEqual(stats, (90, 85, 70, 0))
         self.assertEqual(db.execute("SELECT COUNT(*) FROM players").fetchone()[0], 0)
         self.assertEqual(db.execute("SELECT COUNT(*) FROM inventories").fetchone()[0], 0)
         self.assertEqual(db.execute("SELECT title FROM achievements WHERE achievement_id = 3").fetchone()[0], "First Win")
