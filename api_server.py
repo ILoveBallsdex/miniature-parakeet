@@ -925,12 +925,55 @@ def create_app(api_key: str) -> web.Application:
     return app
 
 
+def seed_test_cards():
+    """Add five harmless test cards once; never overwrite existing catalog entries."""
+    from PIL import Image, ImageDraw
+    from PIL import ImageFont
+
+    test_cards = [
+        {"card_id": 10002, "name": "Kylian Mbappe", "attack": 98, "defense": 40, "speed": 96, "overall": 96, "card_rarity": "Rare", "card_type": "Standard", "height": "178", "club": "Real Madrid", "position": "ST", "league": "La Liga", "nation": "France"},
+        {"card_id": 10003, "name": "Vinicius Junior", "attack": 97, "defense": 36, "speed": 95, "overall": 94, "card_rarity": "Rare", "card_type": "Standard", "height": "176", "club": "Real Madrid", "position": "LW", "league": "La Liga", "nation": "Brazil"},
+        {"card_id": 10004, "name": "Jude Bellingham", "attack": 90, "defense": 87, "speed": 84, "overall": 95, "card_rarity": "Rare", "card_type": "Standard", "height": "186", "club": "Real Madrid", "position": "CM", "league": "La Liga", "nation": "England"},
+        {"card_id": 10005, "name": "Ruben Dias", "attack": 50, "defense": 95, "speed": 76, "overall": 93, "card_rarity": "Rare", "card_type": "Standard", "height": "187", "club": "Manchester City", "position": "CB", "league": "Premier League", "nation": "Portugal"},
+        {"card_id": 10006, "name": "Mohamed Salah", "attack": 96, "defense": 45, "speed": 91, "overall": 93, "card_rarity": "Rare", "card_type": "Standard", "height": "175", "club": "Liverpool", "position": "RW", "league": "Premier League", "nation": "Egypt"},
+    ]
+
+    asset_root = Path(os.getenv("FUTBOT_ASSET_DIR", ".")).expanduser().resolve()
+    card_dir = asset_root / "cards"
+    card_dir.mkdir(parents=True, exist_ok=True)
+    colors = [(26, 74, 150), (93, 40, 160), (28, 105, 78), (45, 55, 72), (135, 75, 25)]
+    for index, card in enumerate(test_cards):
+        if services.get_card(card["card_id"]) is not None:
+            continue
+        image_path = card_dir / f'{card["card_id"]}.png'
+        image = Image.new("RGB", (600, 840), colors[index])
+        draw = ImageDraw.Draw(image)
+        try:
+            title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 42)
+            rating_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 110)
+            body_font = ImageFont.truetype("DejaVuSans.ttf", 30)
+        except OSError:
+            title_font = rating_font = body_font = ImageFont.load_default()
+        draw.rounded_rectangle((18, 18, 582, 822), radius=34, outline=(235, 210, 145), width=9)
+        draw.text((48, 55), str(card["overall"]), font=rating_font, fill=(255, 255, 235))
+        draw.text((50, 190), card["position"], font=title_font, fill=(255, 230, 150))
+        draw.text((50, 430), card["name"], font=title_font, fill="white")
+        draw.text((50, 510), card["club"], font=body_font, fill=(235, 235, 235))
+        draw.text((50, 590), f'ATK {card["attack"]}   DEF {card["defense"]}', font=body_font, fill="white")
+        draw.text((50, 645), f'SPD {card["speed"]}   {card["nation"]}', font=body_font, fill="white")
+        image.save(image_path, format="PNG")
+        card["image_path"] = f'cards/{card["card_id"]}.png'
+        services.create_catalog_card(card)
+        logger.info("Seeded test card %s (%s)", card["card_id"], card["name"])
+
+
 def main():
     api_key = os.getenv("FUTBOT_API_KEY")
     if not api_key:
         raise RuntimeError("FUTBOT_API_KEY is required. Set it in the environment.")
 
     init_database()
+    seed_test_cards()
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("PORT", os.getenv("API_PORT", "8000")))
     logger.info("Starting FutBot API on %s:%s", host, port)
