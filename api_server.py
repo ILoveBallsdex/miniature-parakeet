@@ -305,6 +305,12 @@ async def player_lineup_image(request):
                        y + card_height + 320), rating_label,
                       font=small_font, fill=(235, 245, 235))
 
+    # Render the complete pitch at 2x size so the field, cards, labels,
+    # formation title, and penalty badges all scale together.
+    canvas = canvas.resize(
+        (canvas.width * 2, canvas.height * 2),
+        Image.Resampling.LANCZOS,
+    )
     output = BytesIO()
     canvas.save(output, format="PNG", optimize=True)
     return web.Response(body=output.getvalue(), content_type="image/png")
