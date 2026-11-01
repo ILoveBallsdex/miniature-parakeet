@@ -399,7 +399,7 @@ async def player_lineup_image(request):
                     if formation_name == "3-2-2":
                         y += 2000  # Move the 3-2-2 CMs down a decent amount.
                     elif formation_name == "3-3-1CAM":
-                        y += 1500  # Move the 3-3-1 CAM formation's CMs down.
+                        pass  # Applied below after role-specific positioning.
                     elif formation_name == "3-3-1CM":
                         y += 600
                     if special_midfield_count == 2 and len(cm_items) == 2:
@@ -416,7 +416,7 @@ async def player_lineup_image(request):
                     if position == "CAM":
                         y = row_y - 550
                         if formation_name == "3-3-1CAM":
-                            y += 1500  # Move the CAM down with the CMs.
+                            pass  # Applied below after role-specific positioning.
                     elif position == "CDM":
                         if len(rows["def"]) == 3:
                             y = row_y + 500
@@ -426,6 +426,11 @@ async def player_lineup_image(request):
                             y = row_y + 1200
                         else:
                             y = row_y + 900
+
+            # Apply 3-3-1 CAM vertical movement after all role-specific positioning.
+            # This keeps both CAM and CM adjustments active regardless of midfield branch logic.
+            if row_name == "mid" and formation_name == "3-3-1CAM" and position in ("CAM", "CM"):
+                y += 1200
 
             # 3-2-2 has only CMs (no CAM/CDM), so this must be outside the special-midfield branch.
             if row_name == "mid" and position == "CM" and formation_name == "3-2-2":
