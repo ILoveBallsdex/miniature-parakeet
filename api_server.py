@@ -459,7 +459,7 @@ async def player_lineup_image(request):
             if row_name == "mid" and position == "CM" and formation_name == "4-2-1" and len(cm_items) == 2:
                 cm_index_421 = cm_items.index(slot)
                 center = canvas_width // 2
-                cm_edge_gap = 2300
+                cm_edge_gap = 1400
                 cm_centers = (
                     center - (card_width + cm_edge_gap) / 2,
                     center + (card_width + cm_edge_gap) / 2,
