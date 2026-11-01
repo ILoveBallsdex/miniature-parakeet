@@ -430,6 +430,12 @@ async def player_lineup_image(request):
             # 3-2-2 has only CMs (no CAM/CDM), so this must be outside the special-midfield branch.
             if row_name == "mid" and position == "CM" and formation_name == "3-2-2":
                 y += 400
+                # This formation has no CAM/CDM, so spread its CMs here.
+                cm_index = cm_items.index(slot)
+                spacing = card_width + 2400
+                center = canvas_width // 2
+                cm_centers = (center - spacing / 2, center + spacing / 2)
+                x = int(cm_centers[cm_index] - card_width / 2)
 
             card = slot.get("card")
             if card and card.get("image_path"):
