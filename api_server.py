@@ -364,7 +364,7 @@ async def player_lineup_image(request):
         if len(cm_items) == 2 and len(rows["def"]) == 2:
             cm_gap_x = 500 if formation_name == "2-4-1" else 1600
         elif len(cm_items) == 2 and len(rows["def"]) == 3:
-            cm_gap_x = 1900 if formation_name == "3-3-1CDM" else 1400
+            cm_gap_x = 1900 if formation_name == "3-3-1CDM" else 1800 if formation_name == "3-2-2" else 1400
         elif len(cm_items) == 2 and len(rows["def"]) == 4:
             cm_gap_x = 950
         cm_total_width = len(cm_items) * card_width + max(0, len(cm_items) - 1) * cm_gap_x
