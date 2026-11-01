@@ -1747,6 +1747,31 @@ def confirm_exchange(session_id: str, user_id: int):
                 db.execute("UPDATE inventories SET user_id = ?, trade_count = COALESCE(trade_count, 0) + 1 WHERE user_id = ? AND card_id = ?", (p2_id, p1_id, card_id))
             for card_id in p2_cards:
                 db.execute("UPDATE inventories SET user_id = ?, trade_count = COALESCE(trade_count, 0) + 1 WHERE user_id = ? AND card_id = ?", (p1_id, p2_id, card_id))
+
+            # A traded player must no longer occupy a slot in the previous
+            # owner's lineup. Keep this in the same transaction as the
+            # inventory transfer so /show and friendly lineups update together.
+            for owner_id, transferred_ids in ((p1_id, p1_cards), (p2_id, p2_cards)):
+                if not transferred_ids:
+                    continue
+                lineup_row = db.execute(
+                    "SELECT slots FROM lineups WHERE user_id = ?",
+                    (owner_id,),
+                ).fetchone()
+                if lineup_row is None:
+                    continue
+                slots = json.loads(lineup_row["slots"])
+                transferred = {str(card_id) for card_id in transferred_ids}
+                updated_slots = {
+                    slot: card_id for slot, card_id in slots.items()
+                    if card_id is None or str(card_id) not in transferred
+                }
+                if updated_slots != slots:
+                    db.execute(
+                        "UPDATE lineups SET slots = ? WHERE user_id = ?",
+                        (json.dumps(updated_slots), owner_id),
+                    )
+
             db.execute("UPDATE players SET coins = coins - ? + ? WHERE user_id = ?", (p1_coins, p2_coins, p1_id))
             db.execute("UPDATE players SET coins = coins - ? + ? WHERE user_id = ?", (p2_coins, p1_coins, p2_id))
             db.execute("UPDATE exchange_sessions SET status = 'completed', updated_at = ? WHERE session_id = ?", (datetime.utcnow().isoformat(), session_id))
