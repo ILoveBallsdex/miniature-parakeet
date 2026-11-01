@@ -1731,6 +1731,10 @@ def confirm_exchange(session_id: str, user_id: int):
             key = "p2_confirmed"
         else:
             raise GameError("You are not part of this exchange.", 403)
+        if row[key]:
+            db.execute(f"UPDATE exchange_sessions SET {key} = 0, updated_at = ? WHERE session_id = ?", (datetime.utcnow().isoformat(), session_id))
+            row = _exchange_row(db, session_id)
+            return dict(row)
         db.execute(f"UPDATE exchange_sessions SET {key} = 1, updated_at = ? WHERE session_id = ?", (datetime.utcnow().isoformat(), session_id))
         row = _exchange_row(db, session_id)
         if row["p1_confirmed"] and row["p2_confirmed"]:
