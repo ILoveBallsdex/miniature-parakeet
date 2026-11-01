@@ -364,7 +364,7 @@ async def player_lineup_image(request):
         if len(cm_items) == 2 and len(rows["def"]) == 2:
             cm_gap_x = 500 if formation_name == "2-4-1" else 1600
         elif len(cm_items) == 2 and len(rows["def"]) == 3:
-            cm_gap_x = 1900 if formation_name == "3-3-1CDM" else 1800 if formation_name == "3-2-2" else 1400
+            cm_gap_x = 1900 if formation_name == "3-3-1CDM" else 1800 if formation_name == "3-2-2" else 1600 if formation_name == "3-3-1CAM" else 1400
         elif len(cm_items) == 2 and len(rows["def"]) == 4:
             cm_gap_x = 950
         cm_total_width = len(cm_items) * card_width + max(0, len(cm_items) - 1) * cm_gap_x
@@ -437,9 +437,9 @@ async def player_lineup_image(request):
                 and len(cm_items) == 2
             )
             if is_331_cam_setup and position == "CAM":
-                y = row_y + 300
+                y = row_y + 200
             elif is_331_cam_setup and position == "CM":
-                y = row_y + 900
+                y = row_y + 800
 
             # 3-2-2 has only CMs (no CAM/CDM), so this must be outside the special-midfield branch.
             if row_name == "mid" and position == "CM" and formation_name == "3-2-2":
