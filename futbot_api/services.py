@@ -51,13 +51,21 @@ def search_cards(search: str = "", limit: int = 50, offset: int = 0):
     return [dict(row) for row in rows]
 
 
+POSITION_ALIASES = {"LCB": "CB", "RCB": "CB", "LWB": "LB", "RWB": "RB", "LM": "CM", "RM": "CM", "CF": "ST"}
+
+
+def normalize_position(position):
+    value = str(position or "").strip().upper()
+    return POSITION_ALIASES.get(value, value)
+
+
 def search_card_catalog(search: str = "", limit: int = 5, offset: int = 0,
                         tier=None, position=None):
     """Search the standard-player catalog by pack tier and position, with total count."""
     limit = max(1, min(int(limit), 100))
     offset = max(0, int(offset))
     tier = str(tier or "").strip().lower()
-    position = str(position or "").strip().upper()
+    position = normalize_position(position)
 
     tier_ranges = {
         "bronze": (45, 64),
@@ -227,7 +235,7 @@ def _clean_catalog_card(payload: dict, creating: bool):
             continue
         if not isinstance(value, str) or not value.strip():
             raise GameError(f"{field} must be a non-empty string.")
-        result[field] = value.strip()[:100]
+        result[field] = normalize_position(value) if field == "position" else value.strip()[:100]
 
     # Keep older integrations working while calculating from the new stats.
     if "shooting" not in result and "attack" in result:
