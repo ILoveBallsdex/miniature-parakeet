@@ -1637,3 +1637,6 @@ if __name__ == "__main__":
     main()
 
 # Deployment verification: confirm Railway is running the latest GitHub revision.
+
+
+# Deployment refresh: keep the API service in sync with the Discord bot.
