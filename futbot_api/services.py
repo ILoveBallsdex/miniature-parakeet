@@ -497,6 +497,33 @@ PLAYER_PACKS = {
 }
 
 
+
+def get_player_pack_odds(tier: str):
+    tier = str(tier or "").lower()
+    pack = PLAYER_PACKS.get(tier)
+    if pack is None:
+        raise GameError("Invalid player pack tier.")
+    with read_connection() as db:
+        rows = db.execute(
+            """SELECT overall, COUNT(*) AS count FROM cards
+            WHERE overall BETWEEN ? AND ? AND card_type = ?
+            GROUP BY overall ORDER BY overall""",
+            (pack["min_overall"], pack["max_overall"], pack["card_type"]),
+        ).fetchall()
+    total = sum(int(row["count"]) for row in rows)
+    return {
+        "tier": tier,
+        "pack": pack["name"],
+        "min_overall": pack["min_overall"],
+        "max_overall": pack["max_overall"],
+        "total_players": total,
+        "overalls": [
+            {"overall": int(row["overall"]), "count": int(row["count"]),
+             "percentage": (int(row["count"]) / total * 100) if total else 0}
+            for row in rows
+        ],
+    }
+
 def open_player_pack(user_id: int, tier: str, size: int):
     tier = str(tier or "").lower()
     if tier == "special":
