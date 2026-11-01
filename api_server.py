@@ -575,6 +575,11 @@ async def card_compare_image(request):
     return web.Response(body=output.getvalue(), content_type="image/png")
 
 
+async def player_pack_odds(request):
+    tier = request.match_info["tier"]
+    return success(services.get_player_pack_odds(tier))
+
+
 async def card_weight(request):
     search = request.query.get("search", "")
     return success(services.get_card_weight(search))
@@ -1365,6 +1370,7 @@ def create_app(api_key: str) -> web.Application:
     app.router.add_get("/api/v1/cards/lookup", card_lookup)
     app.router.add_get("/api/v1/cards/compare-image", card_compare_image)
     app.router.add_get("/api/v1/cards/weight", card_weight)
+    app.router.add_get("/api/v1/packs/odds/{tier:bronze|silver|gold}", player_pack_odds)
     app.router.add_get("/api/v1/cards/{card_id:\\d+}", card_detail)
     app.router.add_get("/api/v1/cards/{card_id:\\d+}/image", card_image)
     app.router.add_post("/api/v1/players/{user_id:\\d+}", create_or_update_player)
