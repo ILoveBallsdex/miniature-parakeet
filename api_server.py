@@ -392,12 +392,12 @@ async def player_lineup_image(request):
                 if len(rows["def"]) == 4 and formation_name == "4-1-2":
                     y += 200
                 elif formation_name == "3-2-2":
-                    y += 300
+                    y += 0  # Move the 3-2-2 strikers up a medium amount.
 
             if row_name == "mid" and special_midfield_count:
                 if position == "CM":
                     if formation_name == "3-2-2":
-                        y += 700
+                        y += 1000  # Move the 3-2-2 CMs down a medium amount.
                     elif formation_name == "3-3-1CAM":
                         y += 900
                     elif formation_name == "3-3-1CM":
