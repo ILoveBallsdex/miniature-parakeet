@@ -427,10 +427,19 @@ async def player_lineup_image(request):
                         else:
                             y = row_y + 900
 
-            # Apply 3-3-1 CAM vertical movement after all role-specific positioning.
-            # This keeps both CAM and CM adjustments active regardless of midfield branch logic.
-            if row_name == "mid" and formation_name == "3-3-1CAM" and position in ("CAM", "CM"):
-                y += 2500  # Strong downward shift applied after all other positioning.
+            # In the 3-3-1 CAM setup, place the CAM and the two CMs on
+            # clearly separate vertical lines. Detect the setup from its actual
+            # lineup positions instead of relying on the formation display name.
+            is_331_cam_setup = (
+                row_name == "mid"
+                and len(rows["def"]) == 3
+                and any(str(item.get("position") or "").upper() == "CAM" for item in rows["mid"])
+                and len(cm_items) == 2
+            )
+            if is_331_cam_setup and position == "CAM":
+                y = row_y + 1000
+            elif is_331_cam_setup and position == "CM":
+                y = row_y + 2500
 
             # 3-2-2 has only CMs (no CAM/CDM), so this must be outside the special-midfield branch.
             if row_name == "mid" and position == "CM" and formation_name == "3-2-2":
