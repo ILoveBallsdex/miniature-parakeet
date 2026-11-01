@@ -389,7 +389,11 @@ async def player_lineup_image(request):
             if row_name == "att" and position == "CF":
                 y += 250
             if row_name == "att" and position == "ST":
-                if len(rows["def"]) == 4 and formation_name == "4-1-2":
+                if len(rows["def"]) == 3 and sum(
+                    str(item.get("position") or "").upper() == "CM" for item in rows["mid"]
+                ) == 3:
+                    y += 200  # Slightly lower the striker in the 3-3-1 three-CM setup.
+                elif len(rows["def"]) == 4 and formation_name == "4-1-2":
                     y += 200
                 elif formation_name == "3-2-2":
                     y += 300  # Move the 3-2-2 strikers down a decent amount.
