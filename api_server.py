@@ -1259,7 +1259,11 @@ async def create_exchange(request):
         p2 = int(payload["player2_id"])
     except (KeyError, TypeError, ValueError):
         raise services.GameError("player1_id and player2_id are required.")
-    return success(services.create_exchange(p1, p2), 201)
+    return success(services.create_exchange(
+        p1, p2,
+        str(payload.get("player1_name") or p1),
+        str(payload.get("player2_name") or p2),
+    ), 201)
 
 
 async def exchange_detail(request):
