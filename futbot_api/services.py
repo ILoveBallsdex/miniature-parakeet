@@ -794,7 +794,13 @@ def _lineup_data(db,user_id):
  formation=row["formation"] if row else "2-2-3"; slots=json.loads(row["slots"]) if row else {}
  result=[]
  for number,pos in enumerate(FORMATIONS[formation],1):
-  cid=slots.get(str(number)); rowcard=db.execute("SELECT * FROM cards WHERE card_id=?",(cid,)).fetchone() if cid else None
+  cid=slots.get(str(number))
+  # A saved lineup is not proof of current ownership. Trades can change
+  # inventory ownership, so never render a card for a user who no longer owns it.
+  rowcard=db.execute(
+   "SELECT c.* FROM cards c JOIN inventories i ON i.card_id=c.card_id WHERE c.card_id=? AND i.user_id=? LIMIT 1",
+   (cid,user_id),
+  ).fetchone() if cid else None
   card=dict(rowcard) if rowcard else None
   if card:
    penalty=position_penalty(card.get("position"),pos)
@@ -1771,6 +1777,20 @@ def confirm_exchange(session_id: str, user_id: int):
                         "UPDATE lineups SET slots = ? WHERE user_id = ?",
                         (json.dumps(updated_slots), owner_id),
                     )
+
+                # Also remove transferred cards from saved five-card decks.
+                deck_rows = db.execute(
+                    "SELECT rowid, cards FROM decks WHERE user_id = ?",
+                    (owner_id,),
+                ).fetchall()
+                for deck in deck_rows:
+                    deck_ids = [value.strip() for value in (deck["cards"] or "").split(",") if value.strip()]
+                    kept_ids = [value for value in deck_ids if value not in transferred]
+                    if len(kept_ids) != len(deck_ids):
+                        db.execute(
+                            "UPDATE decks SET cards = ? WHERE rowid = ?",
+                            (",".join(kept_ids), deck["rowid"]),
+                        )
 
             db.execute("UPDATE players SET coins = coins - ? + ? WHERE user_id = ?", (p1_coins, p2_coins, p1_id))
             db.execute("UPDATE players SET coins = coins - ? + ? WHERE user_id = ?", (p2_coins, p1_coins, p2_id))
