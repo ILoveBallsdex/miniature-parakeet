@@ -808,7 +808,8 @@ def add_lineup_player(user_id,player_name,slot):
   formation=row["formation"] if row else "2-2-3"; slots=json.loads(row["slots"]) if row else {}
   card=_match_owned_lineup_player(db,user_id,player_name)
   cid=int(card["card_id"])
-  if str(slot) in slots and int(slots[str(slot)])!=cid: raise GameError("That slot is occupied. Remove its player first.",409)
+  existing_card_id = slots.get(str(slot))
+  if existing_card_id is not None and int(existing_card_id) != cid: raise GameError("That slot is occupied. Remove its player first.",409)
   if str(cid) in [str(v) for k,v in slots.items() if k!=str(slot)]: raise GameError("That player is already in your lineup.",409)
   slots[str(slot)]=cid
   db.execute("INSERT INTO lineups(user_id,formation,slots) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET slots=excluded.slots",(user_id,formation,json.dumps(slots)))
