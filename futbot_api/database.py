@@ -190,6 +190,14 @@ def init_database() -> None:
         _add_columns(db, "market_listings", {
             "status": "TEXT DEFAULT 'active'", "resolved_at": "TEXT", "buyer_id": "INTEGER",
         })
+        # Normalize legacy position labels across the entire card catalog.
+        db.execute("""UPDATE cards SET position = CASE UPPER(TRIM(position))
+            WHEN 'LCB' THEN 'CB' WHEN 'RCB' THEN 'CB'
+            WHEN 'LWB' THEN 'LB' WHEN 'RWB' THEN 'RB'
+            WHEN 'LM' THEN 'CM' WHEN 'RM' THEN 'CM'
+            WHEN 'CF' THEN 'ST' ELSE UPPER(TRIM(position)) END
+            WHERE position IS NOT NULL""")
+
         # Migrate legacy stats once; existing DEF values remain unchanged.
         db.execute("""UPDATE cards SET
             shooting = COALESCE(shooting, attack, 0),
