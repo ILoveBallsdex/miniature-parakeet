@@ -1659,8 +1659,8 @@ def _exchange_row(db, session_id):
 def update_exchange_offer(session_id: str, user_id: int, card_ids: list[int], coins: int):
     from datetime import datetime
     card_ids = list(dict.fromkeys(int(card_id) for card_id in card_ids))
-    if len(card_ids) > 25:
-        raise GameError("You can offer at most 25 cards.")
+    if len(card_ids) > 5:
+        raise GameError("You can offer at most 5 cards.")
     if coins < 0:
         raise GameError("Coin offer cannot be negative.")
     with transaction() as db:
@@ -1712,8 +1712,6 @@ def confirm_exchange(session_id: str, user_id: int):
         row = _exchange_row(db, session_id)
         if row["status"] != "open":
             raise GameError("This exchange is no longer open.", 409)
-        if not row["p1_locked"] or not row["p2_locked"]:
-            raise GameError("Both players must lock their offers before confirming.", 409)
         if user_id == row["player1_id"]:
             key = "p1_confirmed"
         elif user_id == row["player2_id"]:
