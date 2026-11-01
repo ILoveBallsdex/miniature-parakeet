@@ -448,7 +448,7 @@ async def player_lineup_image(request):
             # Detect the 3-3-1 three-CM setup from the actual lineup structure.
             # This works even if the saved formation label differs.
             if row_name == "mid" and position == "CM" and len(rows["def"]) == 3 and len(cm_items) == 3:
-                y = row_y + 300
+                y = row_y + 600
 
             # 3-2-2 has only CMs (no CAM/CDM), so this must be outside the special-midfield branch.
             if row_name == "mid" and position == "CM" and formation_name == "3-2-2":
