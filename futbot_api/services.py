@@ -847,6 +847,19 @@ def add_lineup_player(user_id,player_name,slot):
  with transaction() as db:
   row=db.execute("SELECT formation,slots FROM lineups WHERE user_id=?",(user_id,)).fetchone()
   formation=row["formation"] if row else "2-2-3"; slots=json.loads(row["slots"]) if row else {}
+  # Old lineup JSON can retain card IDs after a trade. Remove every slot
+  # whose card is no longer in this user's inventory before checking
+  # whether the requested slot/player is already assigned.
+  owned_ids = {
+   str(item["card_id"]) for item in db.execute(
+    "SELECT card_id FROM inventories WHERE user_id=?",
+    (user_id,),
+   ).fetchall()
+  }
+  slots = {
+   key: value for key, value in slots.items()
+   if value is not None and str(value) in owned_ids
+  }
   card=_match_owned_lineup_player(db,user_id,player_name)
   cid=int(card["card_id"])
   existing_card_id = slots.get(str(slot))
