@@ -829,6 +829,16 @@ def remove_lineup_player(user_id,slot):
   return _lineup_data(db,user_id)
 
 
+def clear_lineup(user_id):
+ with transaction() as db:
+  row=db.execute("SELECT slots FROM lineups WHERE user_id=?",(user_id,)).fetchone()
+  if not row: raise GameError("You don't have a lineup yet.",404)
+  slots=json.loads(row["slots"])
+  removed=len([card_id for card_id in slots.values() if card_id is not None])
+  db.execute("UPDATE lineups SET slots=? WHERE user_id=?",(json.dumps({}),user_id))
+  return _lineup_data(db,user_id)
+
+
 def swap_lineup_players(user_id,slot1,slot2):
  slot1,slot2=int(slot1),int(slot2)
  if not 1<=slot1<=8 or not 1<=slot2<=8: raise GameError("Both slots must be from 1 to 8.")
