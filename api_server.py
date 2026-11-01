@@ -399,7 +399,7 @@ async def player_lineup_image(request):
                     if formation_name == "3-2-2":
                         y += 2000  # Move the 3-2-2 CMs down a decent amount.
                     elif formation_name == "3-3-1CAM":
-                        y += 900
+                        y += 1500  # Move the 3-3-1 CAM formation's CMs down.
                     elif formation_name == "3-3-1CM":
                         y += 600
                     if special_midfield_count == 2 and len(cm_items) == 2:
@@ -416,7 +416,7 @@ async def player_lineup_image(request):
                     if position == "CAM":
                         y = row_y - 550
                         if formation_name == "3-3-1CAM":
-                            y += 900
+                            y += 1500  # Move the CAM down with the CMs.
                     elif position == "CDM":
                         if len(rows["def"]) == 3:
                             y = row_y + 500
