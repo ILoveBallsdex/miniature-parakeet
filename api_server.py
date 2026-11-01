@@ -443,7 +443,17 @@ async def player_lineup_image(request):
             if is_331_cam_setup and position == "CAM":
                 y = row_y + 100
             elif is_331_cam_setup and position == "CM":
-                y = row_y + 1100
+                y = row_y + 800
+
+            # The 3-3-1 CM formation uses three central midfielders and no CAM/CDM.
+            # Apply the moderate downward adjustment outside the special-midfield branch.
+            if (
+                row_name == "mid"
+                and position == "CM"
+                and formation_name == "3-3-1CM"
+                and not special_midfield_count
+            ):
+                y += 300
 
             # 3-2-2 has only CMs (no CAM/CDM), so this must be outside the special-midfield branch.
             if row_name == "mid" and position == "CM" and formation_name == "3-2-2":
