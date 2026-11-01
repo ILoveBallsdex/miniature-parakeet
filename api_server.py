@@ -405,8 +405,12 @@ async def player_lineup_image(request):
                     if special_midfield_count == 2 and len(cm_items) == 2:
                         # Keep the two CMs wide so the CAM/CDM center lane stays clear.
                         center = canvas_width // 2
-                        spacing = card_width + cm_gap_x
-                        cm_centers = (center - 1.5 * spacing, center + 1.5 * spacing)
+                        if formation_name == "3-3-1CAM":
+                            # Keep both CMs well inside the canvas while spreading them wider.
+                            cm_centers = (center - 2300, center + 2300)
+                        else:
+                            spacing = card_width + cm_gap_x
+                            cm_centers = (center - 1.5 * spacing, center + 1.5 * spacing)
                         x = int(cm_centers[cm_index] - card_width / 2)
                     else:
                         x = cm_start_x + cm_index * (card_width + cm_gap_x)
@@ -437,7 +441,7 @@ async def player_lineup_image(request):
                 and len(cm_items) == 2
             )
             if is_331_cam_setup and position == "CAM":
-                y = row_y + 200
+                y = row_y + 100
             elif is_331_cam_setup and position == "CM":
                 y = row_y + 800
 
