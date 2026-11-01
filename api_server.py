@@ -437,9 +437,9 @@ async def player_lineup_image(request):
                 and len(cm_items) == 2
             )
             if is_331_cam_setup and position == "CAM":
-                y = row_y + 1000
+                y = row_y + 300
             elif is_331_cam_setup and position == "CM":
-                y = row_y + 2500
+                y = row_y + 900
 
             # 3-2-2 has only CMs (no CAM/CDM), so this must be outside the special-midfield branch.
             if row_name == "mid" and position == "CM" and formation_name == "3-2-2":
