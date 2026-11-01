@@ -319,7 +319,7 @@ async def player_lineup_image(request):
             elif len(row) == 2 and formation_name == "2-2-3":
                 row_y += 1000  # Move the 2-2-3 center-backs further up.
             else:
-                row_y += 500 if len(row) == 3 else 1800
+                row_y += (800 if formation_name == "3-2-2" else 500) if len(row) == 3 else 1800
         elif row_name == "gk":
             row_y += 400
         count = len(row)
@@ -397,7 +397,7 @@ async def player_lineup_image(request):
             if row_name == "mid" and special_midfield_count:
                 if position == "CM":
                     if formation_name == "3-2-2":
-                        y += 1000  # Move the 3-2-2 CMs down a medium amount.
+                        y += 1300  # Move the 3-2-2 CMs further down.
                     elif formation_name == "3-3-1CAM":
                         y += 900
                     elif formation_name == "3-3-1CM":
