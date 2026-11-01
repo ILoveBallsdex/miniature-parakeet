@@ -401,7 +401,7 @@ async def player_lineup_image(request):
                     elif formation_name == "3-3-1CAM":
                         pass  # Applied below after role-specific positioning.
                     elif formation_name == "3-3-1CM":
-                        y += 600
+                        pass  # Applied below using the actual three-CM lineup structure.
                     if special_midfield_count == 2 and len(cm_items) == 2:
                         # Keep the two CMs wide so the CAM/CDM center lane stays clear.
                         center = canvas_width // 2
@@ -445,15 +445,10 @@ async def player_lineup_image(request):
             elif is_331_cam_setup and position == "CM":
                 y = row_y + 800
 
-            # The 3-3-1 CM formation uses three central midfielders and no CAM/CDM.
-            # Apply the moderate downward adjustment outside the special-midfield branch.
-            if (
-                row_name == "mid"
-                and position == "CM"
-                and formation_name == "3-3-1CM"
-                and not special_midfield_count
-            ):
-                y += 300
+            # Detect the 3-3-1 three-CM setup from the actual lineup structure.
+            # This works even if the saved formation label differs.
+            if row_name == "mid" and position == "CM" and len(rows["def"]) == 3 and len(cm_items) == 3:
+                y = row_y + 300
 
             # 3-2-2 has only CMs (no CAM/CDM), so this must be outside the special-midfield branch.
             if row_name == "mid" and position == "CM" and formation_name == "3-2-2":
