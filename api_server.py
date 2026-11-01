@@ -454,6 +454,18 @@ async def player_lineup_image(request):
             if row_name == "mid" and position == "CM" and len(rows["def"]) == 3 and len(cm_items) == 3:
                 y = row_y + 600
 
+            # In 4-2-1, position both CMs explicitly so their spacing is
+            # applied even when the lineup has no CAM/CDM special-midfield roles.
+            if row_name == "mid" and position == "CM" and formation_name == "4-2-1" and len(cm_items) == 2:
+                cm_index_421 = cm_items.index(slot)
+                center = canvas_width // 2
+                cm_edge_gap = 2300
+                cm_centers = (
+                    center - (card_width + cm_edge_gap) / 2,
+                    center + (card_width + cm_edge_gap) / 2,
+                )
+                x = int(cm_centers[cm_index_421] - card_width / 2)
+
             # 3-2-2 has only CMs (no CAM/CDM), so this must be outside the special-midfield branch.
             if row_name == "mid" and position == "CM" and formation_name == "3-2-2":
                 y += 400
