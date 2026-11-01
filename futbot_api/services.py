@@ -1628,15 +1628,22 @@ def resolve_trade_offer(trade_id: str, user_id: int, accept: bool):
     return dict(result)
 
 
-def create_exchange(player1_id: int, player2_id: int):
+def create_exchange(player1_id: int, player2_id: int, player1_name: str = None, player2_name: str = None):
     import uuid
     from datetime import datetime
     if player1_id == player2_id:
         raise GameError("You cannot exchange with yourself.")
     with transaction() as db:
-        for user_id in (player1_id, player2_id):
-            if not db.execute("SELECT 1 FROM players WHERE user_id = ?", (user_id,)).fetchone():
-                raise GameError(f"Player {user_id} does not exist.", 404)
+        # Discord members may already own inventory rows without having a
+        # players profile row. Create missing profiles at trade start.
+        for user_id, name in (
+            (player1_id, player1_name or str(player1_id)),
+            (player2_id, player2_name or str(player2_id)),
+        ):
+            db.execute(
+                "INSERT INTO players (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO NOTHING",
+                (user_id, str(name).strip()[:100] or str(user_id)),
+            )
         session_id = uuid.uuid4().hex
         now = datetime.utcnow().isoformat()
         db.execute(
