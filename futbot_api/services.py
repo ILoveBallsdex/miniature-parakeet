@@ -919,6 +919,32 @@ def _weighted_choice(weighted):
 
 
 
+
+def get_reward_card_odds():
+    """Return the single-draw overall distribution used by /claim and /daily."""
+    with transaction() as db:
+        rows = db.execute("SELECT overall FROM cards ORDER BY card_id").fetchall()
+    tiers = ((45, 64, 45), (65, 74, 30), (75, 79, 18), (80, 85, 7))
+    counts = {(low, high): sum(1 for row in rows if low <= int(row["overall"] or 0) <= high)
+              for low, high, _ in tiers}
+    total_weight = sum(chance for low, high, chance in tiers if counts[(low, high)])
+    totals = {}
+    overall_counts = {}
+    for row in rows:
+        overall = int(row["overall"] or 0)
+        for low, high, chance in tiers:
+            if low <= overall <= high and counts[(low, high)]:
+                totals[overall] = totals.get(overall, 0) + chance / counts[(low, high)]
+                overall_counts[overall] = overall_counts.get(overall, 0) + 1
+                break
+    overall_rows = [
+        {"overall": overall, "count": overall_counts[overall],
+         "percentage": (weight / total_weight * 100) if total_weight else 0}
+        for overall, weight in sorted(totals.items())
+    ]
+    return {"overalls": overall_rows, "total_players": sum(overall_counts.values()),
+            "weight_type": "single-card draw"}
+
 def _grant_random_reward(user_id: int, amount: int, cooldown_column: str, cooldown_seconds: int, coins: int = 0):
     """Grant weighted random cards and optional coins, enforcing cooldown atomically."""
     if cooldown_column not in ("last_daily_reward_claim", "last_quick_claim"):
