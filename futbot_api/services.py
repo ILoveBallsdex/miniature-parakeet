@@ -23,7 +23,7 @@ class GameError(Exception):
 def card_value(overall: int) -> int:
     """Return an exponentially scaling player value, starting at 1,000 coins for 60 OVR."""
     overall = int(overall or 0)
-    return max(1, round(1000 * (1.18 ** (overall - 60))))
+    return max(1, round(1000 * (1.16 ** (overall - 60))))
 
 
 def quicksell_value(overall: int) -> int:
