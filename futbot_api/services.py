@@ -499,9 +499,9 @@ def open_pack(user_id: int, pack_id: int):
 
 
 PLAYER_PACKS = {
-    "bronze": {"name": "Bronze Player Pack", "min_overall": 45, "max_overall": 64, "costs": {2: 2250, 5: 5063, 10: 9000}, "card_type": "Standard"},
-    "silver": {"name": "Silver Player Pack", "min_overall": 65, "max_overall": 74, "costs": {2: 5750, 5: 12938, 10: 23000}, "card_type": "Standard"},
-    "gold": {"name": "Gold Player Pack", "min_overall": 75, "max_overall": 99, "costs": {2: 75000, 5: 168750, 10: 300000}, "card_type": "Standard"},
+    "bronze": {"name": "Bronze Player Pack", "min_overall": 45, "max_overall": 64, "costs": {2: 2300, 5: 5150, 10: 9150}, "card_type": "Standard"},
+    "silver": {"name": "Silver Player Pack", "min_overall": 65, "max_overall": 74, "costs": {2: 4800, 5: 10750, 10: 19150}, "card_type": "Standard"},
+    "gold": {"name": "Gold Player Pack", "min_overall": 75, "max_overall": 99, "costs": {2: 42200, 5: 95000, 10: 168850}, "card_type": "Standard"},
 }
 
 
