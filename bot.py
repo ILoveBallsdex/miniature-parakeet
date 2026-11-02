@@ -6660,3 +6660,4 @@ async def _start_dashboard_api():
 #---------------------RUN BOT------------------------
 
 bot.run(TOKEN)
+# Small redeploy trigger; no runtime behavior changed.
