@@ -181,12 +181,12 @@ def _clean_catalog_card(payload: dict, creating: bool):
         if position == "GK"
         else ("shooting", "passing", "dribbling", "defending", "game_iq", "aerial")
     )
-    if creating:
-        missing_stats = [field for field in stat_fields if field not in result]
+    if creating or any(field in payload for field in (*stat_fields, "position")):
+        missing_stats = [field for field in stat_fields if result.get(field) is None]
         if missing_stats:
             raise GameError(
                 ("Goalkeepers" if position == "GK" else "Outfield players")
-                + " require these stats: " + ", ".join(missing_stats)
+                + " require all six stats: " + ", ".join(missing_stats)
             )
     if position == "GK":
         for field in ("shooting", "passing", "dribbling", "defending", "aerial"):
