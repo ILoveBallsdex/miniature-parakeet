@@ -129,12 +129,12 @@ CARD_INTEGER_FIELDS = {
 }
 
 
-def calculate_overall(position: str, **stats) -> int:
+def calculate_overall(player_position: str, **stats) -> int:
     """Calculate OVR as the rounded average of the six position-specific stats."""
-    position = str(position or "").upper()
+    player_position = str(player_position or "").upper()
     fields = (
         ("diving", "handling", "kicking", "reflexes", "game_iq", "positioning")
-        if position == "GK"
+        if player_position == "GK"
         else ("shooting", "passing", "dribbling", "defending", "game_iq", "aerial")
     )
     return int(round(sum(float(stats.get(field, 0) or 0) for field in fields) / len(fields)))
