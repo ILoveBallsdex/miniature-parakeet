@@ -1607,7 +1607,30 @@ def seed_test_cards():
                 continue
             card = existing_card
         else:
-            # Convert legacy seed values into the new stat fields and calculate OVR.
+            # Convert the legacy test-card attributes into the six position-based stats.
+            attack = int(card.get("attack") or 0)
+            defense = int(card.get("defense") or 0)
+            speed = int(card.get("speed") or 0)
+            position = str(card.get("position") or "").upper()
+            if position == "GK":
+                card.update({
+                    "diving": defense,
+                    "handling": defense,
+                    "kicking": speed,
+                    "reflexes": defense,
+                    "game_iq": attack,
+                    "positioning": defense,
+                })
+            else:
+                passing = round((attack + defense) / 2)
+                card.update({
+                    "shooting": attack,
+                    "passing": passing,
+                    "dribbling": speed,
+                    "defending": defense,
+                    "game_iq": round((passing + defense) / 2),
+                    "aerial": round((defense + speed) / 2),
+                })
             card.update(services._clean_catalog_card(card, True))
         image_path = card_dir / f'{card["card_id"]}.png'
         image = Image.new("RGB", (600, 840), colors[index % len(colors)])
@@ -1624,10 +1647,13 @@ def seed_test_cards():
         draw.text((50, 430), card["name"], font=title_font, fill="white")
         draw.text((50, 510), card["club"], font=body_font, fill=(235, 235, 235))
         if str(card.get("position") or "").upper() == "GK":
-            draw.text((50, 590), f'GK {card["goalkeeping"]}', font=body_font, fill="white")
+            draw.text((50, 570), f'DIV {card["diving"]}  HAN {card["handling"]}', font=body_font, fill="white")
+            draw.text((50, 615), f'KIC {card["kicking"]}  REF {card["reflexes"]}', font=body_font, fill="white")
+            draw.text((50, 660), f'IQ {card["game_iq"]}  POS {card["positioning"]}', font=body_font, fill="white")
         else:
-            draw.text((50, 590), f'SHO {card["shooting"]}  PAS {card["passing"]}', font=body_font, fill="white")
-            draw.text((50, 645), f'DRI {card["dribbling"]}  DEF {card["defense"]}', font=body_font, fill="white")
+            draw.text((50, 570), f'SHO {card["shooting"]}  PAS {card["passing"]}', font=body_font, fill="white")
+            draw.text((50, 615), f'DRI {card["dribbling"]}  DEF {card["defending"]}', font=body_font, fill="white")
+            draw.text((50, 660), f'IQ {card["game_iq"]}  AER {card["aerial"]}', font=body_font, fill="white")
         image.save(image_path, format="PNG")
         card["image_path"] = f'cards/{card["card_id"]}.png'
         if existing_card is not None:
