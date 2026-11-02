@@ -274,6 +274,9 @@ def update_catalog_card(card_id: int, payload: dict):
             raise GameError("Card not found.", 404)
         merged = dict(existing)
         merged.update(payload)
+        # Recalculate OVR after stat/position edits only when the admin did not provide one.
+        if "overall" not in payload and (set(payload) & stat_fields):
+            merged.pop("overall", None)
         values = _clean_catalog_card(merged, False)
         values.pop("card_id", None)
         # Preserve an explicitly supplied OVR; otherwise metadata-only edits leave it unchanged.
