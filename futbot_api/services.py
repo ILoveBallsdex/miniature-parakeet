@@ -21,9 +21,9 @@ class GameError(Exception):
 
 
 def card_value(overall: int) -> int:
-    """Return a smoothly scaling player value, starting at 1,000 coins for 60 OVR."""
+    """Return an exponentially scaling player value, starting at 1,000 coins for 60 OVR."""
     overall = int(overall or 0)
-    return max(1, round(1000 * (1.10 ** (overall - 60))))
+    return max(1, round(1000 * (1.18 ** (overall - 60))))
 
 
 def quicksell_value(overall: int) -> int:
@@ -501,7 +501,7 @@ def open_pack(user_id: int, pack_id: int):
 PLAYER_PACKS = {
     "bronze": {"name": "Bronze Player Pack", "min_overall": 45, "max_overall": 64, "costs": {2: 2250, 5: 5063, 10: 9000}, "card_type": "Standard"},
     "silver": {"name": "Silver Player Pack", "min_overall": 65, "max_overall": 74, "costs": {2: 5750, 5: 12938, 10: 23000}, "card_type": "Standard"},
-    "gold": {"name": "Gold Player Pack", "min_overall": 75, "max_overall": 99, "costs": {2: 18000, 5: 40500, 10: 72000}, "card_type": "Standard"},
+    "gold": {"name": "Gold Player Pack", "min_overall": 75, "max_overall": 99, "costs": {2: 75000, 5: 168750, 10: 300000}, "card_type": "Standard"},
 }
 
 
