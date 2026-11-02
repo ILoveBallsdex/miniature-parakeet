@@ -202,6 +202,47 @@ def _clean_catalog_card(payload: dict, creating: bool):
         result.setdefault("player_id", str(result["card_id"]))
     return result
 
+
+def recalculate_catalog_overalls():
+    """Backfill six-stat ratings for existing cards and recalculate their OVR."""
+    updated = 0
+    with transaction() as db:
+        rows = db.execute("SELECT * FROM cards").fetchall()
+        for row in rows:
+            card = dict(row)
+            position = normalize_position(card.get("position") or "")
+            if position == "GK":
+                legacy = int(card.get("goalkeeping") or card.get("defense") or 0)
+                stats = {
+                    "diving": int(card.get("diving") if card.get("diving") is not None else legacy),
+                    "handling": int(card.get("handling") if card.get("handling") is not None else legacy),
+                    "kicking": int(card.get("kicking") if card.get("kicking") is not None else legacy),
+                    "reflexes": int(card.get("reflexes") if card.get("reflexes") is not None else legacy),
+                    "game_iq": int(card.get("game_iq") if card.get("game_iq") is not None else legacy),
+                    "positioning": int(card.get("positioning") if card.get("positioning") is not None else legacy),
+                }
+            else:
+                shooting = int(card.get("shooting") if card.get("shooting") is not None else (card.get("attack") or 0))
+                passing = int(card.get("passing") if card.get("passing") is not None else round((shooting + int(card.get("defense") or 0)) / 2))
+                dribbling = int(card.get("dribbling") if card.get("dribbling") is not None else (card.get("speed") or 0))
+                defending = int(card.get("defending") if card.get("defending") is not None else (card.get("defense") or 0))
+                stats = {
+                    "shooting": shooting,
+                    "passing": passing,
+                    "dribbling": dribbling,
+                    "defending": defending,
+                    "game_iq": int(card.get("game_iq") if card.get("game_iq") is not None else round((passing + defending) / 2)),
+                    "aerial": int(card.get("aerial") if card.get("aerial") is not None else round((defending + dribbling) / 2)),
+                }
+            overall = calculate_overall(position, **stats)
+            assignments = ", ".join(f"{field} = ?" for field in stats)
+            db.execute(
+                f"UPDATE cards SET {assignments}, overall = ? WHERE card_id = ?",
+                (*stats.values(), overall, card["card_id"]),
+            )
+            updated += 1
+    return updated
+
 def create_catalog_card(payload: dict):
     values = _clean_catalog_card(payload, True)
     columns = ("card_id", *CARD_FIELDS)
