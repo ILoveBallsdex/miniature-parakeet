@@ -79,7 +79,9 @@ def search_card_catalog(search: str = "", limit: int = 5, offset: int = 0,
     if tier == "special":
         return {"cards": [], "total": 0}
 
-    clauses = []
+    # The reserved test-card ID ranges are seeded for development only.
+    # Keep those cards out of the public catalog search.
+    clauses = ["NOT (card_id BETWEEN 10002 AND 10006 OR card_id BETWEEN 10100 AND 10199)"]
     params = []
     if tier:
         low, high = tier_ranges[tier]
@@ -196,7 +198,7 @@ def _clean_catalog_card(payload: dict, creating: bool):
         for field in ("diving", "handling", "kicking", "reflexes", "positioning"):
             if creating:
                 result.setdefault(field, 0)
-    if creating or "position" in result or any(field in result for field in (*stat_fields,)):
+    if "overall" not in result and (creating or "position" in result or any(field in result for field in (*stat_fields,))):
         result["overall"] = calculate_overall(position, **result)
     if creating:
         result.setdefault("player_id", str(result["card_id"]))
@@ -274,8 +276,8 @@ def update_catalog_card(card_id: int, payload: dict):
         merged.update(payload)
         values = _clean_catalog_card(merged, False)
         values.pop("card_id", None)
-        # If this was only a metadata edit, leave the already-calculated OVR alone.
-        if not (set(payload) & stat_fields):
+        # Preserve an explicitly supplied OVR; otherwise metadata-only edits leave it unchanged.
+        if "overall" not in payload and not (set(payload) & stat_fields):
             values.pop("overall", None)
         assignments = ", ".join(f"{field} = ?" for field in values)
         db.execute(f"UPDATE cards SET {assignments} WHERE card_id = ?", (*values.values(), card_id))
