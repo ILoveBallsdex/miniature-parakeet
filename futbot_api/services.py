@@ -117,89 +117,27 @@ def search_card_catalog(search: str = "", limit: int = 5, offset: int = 0,
 CARD_FIELDS = (
     "player_id", "name", "attack", "defense", "speed",
     "shooting", "passing", "dribbling", "goalkeeping",
+    "defending", "game_iq", "aerial", "diving", "handling",
+    "kicking", "reflexes", "positioning",
     "height", "club", "position", "overall", "image_path",
     "card_rarity", "card_type", "league", "nation",
 )
-CARD_INTEGER_FIELDS = {"attack", "defense", "speed", "shooting", "passing", "dribbling", "goalkeeping", "overall"}
+CARD_INTEGER_FIELDS = {
+    "attack", "defense", "speed", "shooting", "passing", "dribbling",
+    "goalkeeping", "defending", "game_iq", "aerial", "diving",
+    "handling", "kicking", "reflexes", "positioning", "overall",
+}
 
 
-def calculate_overall(position: str, shooting=0, passing=0, dribbling=0, defense=0, goalkeeping=0) -> int:
-    """Estimate FIFA-style OVR using position-weighted SHO/PAS/DRI/DEF.
-
-    Public FIFA/FC calculators model outfield OVR with six face stats.
-    Since this game stores only four, PAC and PHY weights are removed and
-    the remaining four weights are normalized to 100%. These are estimates,
-    not EA's undisclosed official formula.
-    """
+def calculate_overall(position: str, **stats) -> int:
+    """Calculate OVR as the rounded average of the six position-specific stats."""
     position = str(position or "").upper()
-    if position == "GK":
-        return int(round(float(goalkeeping or 0)))
-
-    # Source weights are ordered PAC, SHO, PAS, DRI, DEF, PHY.
-    # Each tuple below stores the remaining SHO/PAS/DRI/DEF weights after
-    # removing PAC and PHY and normalizing the four available stats.
-    weights = {
-        # ST source: 25/40/10/15/2/8
-        "ST":  (0.5970, 0.1493, 0.2239, 0.0298),
-        "CF":  (0.5970, 0.1493, 0.2239, 0.0298),
-        "LW":  (0.5970, 0.1493, 0.2239, 0.0298),
-        "RW":  (0.5970, 0.1493, 0.2239, 0.0298),
-        # CAM source: 15/25/25/20/5/10
-        "CAM": (0.3333, 0.3333, 0.2667, 0.0667),
-        # CM source: 10/15/25/20/10/20
-        "CM":  (0.2143, 0.3571, 0.2857, 0.1429),
-        # CDM source: 10/5/25/10/35/15
-        "CDM": (0.0769, 0.3846, 0.1538, 0.5385),
-        # Wide midfielders use the balanced CM profile.
-        "LM":  (0.2143, 0.3571, 0.2857, 0.1429),
-        "RM":  (0.2143, 0.3571, 0.2857, 0.1429),
-        # Full-back source: 25/5/20/15/25/10
-        "LB":  (0.0769, 0.3077, 0.2308, 0.3846),
-        "RB":  (0.0769, 0.3077, 0.2308, 0.3846),
-        "LWB": (0.0769, 0.3077, 0.2308, 0.3846),
-        "RWB": (0.0769, 0.3077, 0.2308, 0.3846),
-        # Center-back source: 10/2/10/8/55/15
-        "CB":  (0.0267, 0.1333, 0.1067, 0.7333),
-        "LCB": (0.0267, 0.1333, 0.1067, 0.7333),
-        "RCB": (0.0267, 0.1333, 0.1067, 0.7333),
-    }
-    position_weights = weights.get(position, (0.25, 0.25, 0.25, 0.25))
-    stats = (shooting, passing, dribbling, defense)
-    score = sum(float(value or 0) * weight for value, weight in zip(stats, position_weights))
-    return int(round(score))
-
-
-def recalculate_catalog_overalls():
-    """Backfill legacy card stats, then recalculate every card's OVR.
-
-    Older catalogs only stored attack/defense/speed. Convert those fields
-    when the newer stats are missing so imported cards do not show zero PAS.
-    """
-    with transaction() as db:
-        rows = db.execute("SELECT * FROM cards").fetchall()
-        for row in rows:
-            position = str(row["position"] or "").upper()
-            shooting = int(row["shooting"] or row["attack"] or 0)
-            passing = int(row["passing"] or 0)
-            dribbling = int(row["dribbling"] or row["speed"] or 0)
-            defense = int(row["defense"] or 0)
-            goalkeeping = int(row["goalkeeping"] or (defense if position == "GK" else 0))
-
-            # A zero PAS in a legacy import means the field was never copied.
-            # Estimate it from the available attacking and defensive ratings.
-            if passing == 0 and (shooting or defense) and position != "GK":
-                passing = round((shooting + defense) / 2)
-
-            overall = calculate_overall(
-                position, shooting, passing, dribbling, defense, goalkeeping,
-            )
-            db.execute(
-                """UPDATE cards
-                SET shooting = ?, passing = ?, dribbling = ?, goalkeeping = ?, overall = ?
-                WHERE card_id = ?""",
-                (shooting, passing, dribbling, goalkeeping, overall, row["card_id"]),
-            )
-    return len(rows)
+    fields = (
+        ("diving", "handling", "kicking", "reflexes", "game_iq", "positioning")
+        if position == "GK"
+        else ("shooting", "passing", "dribbling", "defending", "game_iq", "aerial")
+    )
+    return int(round(sum(float(stats.get(field, 0) or 0) for field in fields) / len(fields)))
 
 
 def _clean_catalog_card(payload: dict, creating: bool):
@@ -237,43 +175,32 @@ def _clean_catalog_card(payload: dict, creating: bool):
             raise GameError(f"{field} must be a non-empty string.")
         result[field] = normalize_position(value) if field == "position" else value.strip()[:100]
 
-    # Keep older integrations working while calculating from the new stats.
-    if "shooting" not in result and "attack" in result:
-        result["shooting"] = result["attack"]
-    if "dribbling" not in result and "speed" in result:
-        result["dribbling"] = result["speed"]
-    if "passing" not in result:
-        if "attack" in result:
-            result["passing"] = round((result.get("shooting", 0) + result.get("defense", 0)) / 2)
-        elif creating:
-            raise GameError("Outfield players require the passing stat.")
-        else:
-            result["passing"] = 0
     position = str(result.get("position", payload.get("position", ""))).upper()
+    stat_fields = (
+        ("diving", "handling", "kicking", "reflexes", "game_iq", "positioning")
+        if position == "GK"
+        else ("shooting", "passing", "dribbling", "defending", "game_iq", "aerial")
+    )
+    if creating:
+        missing_stats = [field for field in stat_fields if field not in result]
+        if missing_stats:
+            raise GameError(
+                ("Goalkeepers" if position == "GK" else "Outfield players")
+                + " require these stats: " + ", ".join(missing_stats)
+            )
     if position == "GK":
-        if "goalkeeping" not in result:
-            if "attack" in result and "defense" in result:
-                result["goalkeeping"] = result["defense"]  # Legacy imports only.
-            elif creating:
-                raise GameError("Goalkeepers require the goalkeeping stat.")
-            else:
-                result["goalkeeping"] = 0
+        for field in ("shooting", "passing", "dribbling", "defending", "aerial"):
+            if creating:
+                result.setdefault(field, 0)
     else:
-        result.setdefault("goalkeeping", 0)
-        if creating:
-            missing_stats = [field for field in ("shooting", "passing", "dribbling", "defense") if field not in result]
-            if missing_stats:
-                raise GameError("Missing player stats: " + ", ".join(missing_stats))
-    if creating or "position" in result or any(field in result for field in ("shooting", "passing", "dribbling", "defense", "goalkeeping")):
-        result["overall"] = calculate_overall(
-            position, result.get("shooting", 0), result.get("passing", 0),
-            result.get("dribbling", 0), result.get("defense", 0),
-            result.get("goalkeeping", 0),
-        )
+        for field in ("diving", "handling", "kicking", "reflexes", "positioning"):
+            if creating:
+                result.setdefault(field, 0)
+    if creating or "position" in result or any(field in result for field in (*stat_fields,)):
+        result["overall"] = calculate_overall(position, **result)
     if creating:
         result.setdefault("player_id", str(result["card_id"]))
     return result
-
 
 def create_catalog_card(payload: dict):
     values = _clean_catalog_card(payload, True)
@@ -297,7 +224,7 @@ def update_catalog_card(card_id: int, payload: dict):
         raise GameError("Card data must be an object.")
     if not payload:
         raise GameError("Provide at least one card field to replace.")
-    stat_fields = {"position", "shooting", "passing", "dribbling", "defense", "goalkeeping", "attack", "speed"}
+    stat_fields = {"position", "shooting", "passing", "dribbling", "defending", "game_iq", "aerial", "diving", "handling", "kicking", "reflexes", "positioning", "defense", "goalkeeping", "attack", "speed"}
     with transaction() as db:
         existing = db.execute("SELECT * FROM cards WHERE card_id = ?", (card_id,)).fetchone()
         if existing is None:
