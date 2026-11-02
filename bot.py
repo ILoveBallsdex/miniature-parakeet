@@ -6661,3 +6661,5 @@ async def _start_dashboard_api():
 
 bot.run(TOKEN)
 # Small redeploy trigger; no runtime behavior changed.
+
+# Railway redeploy trigger (November 2026).
