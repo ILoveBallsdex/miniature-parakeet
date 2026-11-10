@@ -5765,7 +5765,31 @@ async def _send_pending_friend_notification(author, send_func):
 
 @bot.event
 async def on_command_completion(ctx):
-    """Fires for both prefix and slash (hybrid) command completions."""
+    """Log command usage separately from detailed action/audit logs."""
+    command_log_channel_id = 1374495867691597976
+
+    try:
+        channel = bot.get_channel(command_log_channel_id)
+        if channel is None:
+            channel = await bot.fetch_channel(command_log_channel_id)
+
+        command_name = ctx.command.qualified_name if ctx.command else "unknown"
+        command_text = f"/{command_name}" if ctx.interaction else f"{ctx.prefix or ''}{command_name}"
+
+        embed = discord.Embed(
+            title="Command Used",
+            color=discord.Color.blurple(),
+            timestamp=datetime.utcnow()
+        )
+        embed.add_field(name="User", value=ctx.author.mention, inline=True)
+        embed.add_field(name="Command", value=command_text, inline=True)
+        if ctx.guild:
+            embed.add_field(name="Channel", value=ctx.channel.mention, inline=True)
+
+        await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+    except Exception as e:
+        logger.error(f"Failed to send command usage log: {e}")
+
     await _send_pending_friend_notification(ctx.author, ctx.send)
 
 
